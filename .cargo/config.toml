@@ -1,0 +1,10 @@
+[alias]
+test-all = "test --all-features -- --nocapture"
+test-unit = "test --lib -- --nocapture"
+test-integration = "test --test '*' -- --nocapture"
+
+[build]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "link-arg=/STACK:4194304"]

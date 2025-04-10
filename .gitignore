@@ -1,0 +1,38 @@
+/target/
+Cargo.lock
+
+# Arquivos de ambiente
+#.env
+#.env.*
+#!.env.example
+
+# Banco de dados SQLite
+#*.db
+#*.db-shm
+#*.db-wal
+#/data/
+
+# Logs
+#*.log
+#logs/
+
+# Arquivos temporários
+*.tmp
+*.bak
+*.swp
+*~
+
+# Arquivos específicos do sistema operacional
+.DS_Store
+Thumbs.db
+
+# Arquivos de IDE
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Arquivos de certificado
+*.pem
+*.key
+*.crt
