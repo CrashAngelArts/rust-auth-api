@@ -5,6 +5,7 @@ use crate::controllers::{
     user_controller,
     two_factor_controller,
     token_controller,
+    keystroke_controller,
 };
 use crate::middleware::{
     auth::{AdminAuth, JwtAuth},
@@ -90,6 +91,18 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
                             .route("/backup-codes", web::post().to(two_factor_controller::regenerate_backup_codes))
                             // GET /users/{id}/2fa/status - Verifica o status do 2FA
                             .route("/status", web::get().to(two_factor_controller::get_2fa_status)),
+                    )
+                    // Rotas para verificação de ritmo de digitação (keystroke dynamics)
+                    .service(
+                        web::scope("/{id}/keystroke")
+                            // POST /users/{id}/keystroke/register - Registra um novo padrão de digitação
+                            .route("/register", web::post().to(keystroke_controller::register_keystroke_pattern))
+                            // POST /users/{id}/keystroke/verify - Verifica um padrão de digitação
+                            .route("/verify", web::post().to(keystroke_controller::verify_keystroke_pattern))
+                            // PUT /users/{id}/keystroke/toggle - Habilita/desabilita a verificação
+                            .route("/toggle", web::put().to(keystroke_controller::toggle_keystroke_verification))
+                            // GET /users/{id}/keystroke/status - Verifica o status da verificação
+                            .route("/status", web::get().to(keystroke_controller::get_keystroke_status)),
                     ),
             )
             .service(

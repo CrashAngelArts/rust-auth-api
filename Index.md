@@ -1,8 +1,8 @@
-# Rust Auth API - Project Index
+# Rust Auth API - Project Index 🚀
 
 ## Project Structure Overview
 
-This document provides a comprehensive index of the Rust Authentication API project, including all files, folders, methods, functions, and a brief description of each component.
+Este documento fornece um índice abrangente do projeto da API de Autenticação em Rust, incluindo todos os arquivos, pastas, métodos, funções e uma breve descrição de cada componente.
 
 ## Directory Structure
 
@@ -26,7 +26,10 @@ rust-auth-api/
 │   │   ├── auth_controller.rs
 │   │   ├── health_controller.rs
 │   │   ├── mod.rs
-│   │   └── user_controller.rs
+│   │   ├── user_controller.rs
+│   │   ├── two_factor_controller.rs
+│   │   ├── token_controller.rs
+│   │   └── keystroke_controller.rs
 │   ├── db/
 │   │   └── [database files]
 │   ├── errors/
@@ -44,14 +47,20 @@ rust-auth-api/
 │   │   ├── auth.rs
 │   │   ├── mod.rs
 │   │   ├── response.rs
-│   │   └── user.rs
+│   │   ├── user.rs
+│   │   ├── two_factor.rs
+│   │   ├── token.rs
+│   │   └── keystroke_dynamics.rs
 │   ├── routes/
 │   │   └── mod.rs
 │   ├── services/
 │   │   ├── auth_service.rs
 │   │   ├── email_service.rs
 │   │   ├── mod.rs
-│   │   └── user_service.rs
+│   │   ├── user_service.rs
+│   │   ├── two_factor_service.rs
+│   │   ├── token_service.rs
+│   │   └── keystroke_service.rs
 │   └── utils/
 │       └── [utility files]
 ├── target/
@@ -90,19 +99,47 @@ Manages application configuration loaded from environment variables.
 - `Config::from_env()`: Loads configuration from environment variables
 - `load_config()`: Helper function to load the configuration
 
-### Controllers Module (`src/controllers/`)
+### Controllers Module (`src/controllers/`) 🎮
 
 #### auth_controller.rs
-Handles authentication-related HTTP requests.
+Lida com requisições HTTP relacionadas à autenticação.
 
 **Functions:**
-- `register()`: Registers a new user
-- `login()`: Authenticates a user and returns tokens
-- `refresh_token()`: Updates access token using a refresh token
-- `forgot_password()`: Initiates password recovery process
-- `reset_password()`: Resets a user's password
-- `unlock_account()`: Unlocks a locked user account
-- `me()`: Returns the current authenticated user's information
+- `register()`: Registra um novo usuário
+- `login()`: Autentica um usuário e retorna tokens
+- `refresh_token()`: Atualiza token de acesso usando um token de atualização
+- `forgot_password()`: Inicia processo de recuperação de senha
+- `reset_password()`: Redefine a senha de um usuário
+- `unlock_account()`: Desbloqueia uma conta bloqueada
+- `me()`: Retorna as informações do usuário autenticado atual
+
+#### two_factor_controller.rs
+Lida com requisições HTTP relacionadas à autenticação de dois fatores.
+
+**Functions:**
+- `setup_2fa()`: Inicia configuração 2FA e gera QR code
+- `enable_2fa()`: Ativa 2FA após verificar código TOTP
+- `disable_2fa()`: Desativa 2FA após verificação
+- `regenerate_backup_codes()`: Regenera códigos de backup
+- `get_2fa_status()`: Obtém status atual do 2FA
+
+#### token_controller.rs
+Lida com requisições HTTP relacionadas à rotação de tokens.
+
+**Functions:**
+- `rotate_token()`: Rotaciona um token JWT
+- `revoke_token()`: Revoga um token específico
+- `revoke_all_tokens()`: Revoga todos os tokens de um usuário
+- `clean_expired_tokens()`: Limpa tokens expirados da lista negra
+
+#### keystroke_controller.rs
+Lida com requisições HTTP relacionadas à análise de ritmo de digitação.
+
+**Functions:**
+- `register_keystroke_pattern()`: Registra padrão de digitação
+- `verify_keystroke_pattern()`: Verifica padrão durante login
+- `toggle_keystroke_verification()`: Habilita/desabilita verificação
+- `get_keystroke_status()`: Obtém status da verificação
 
 #### user_controller.rs
 Handles user-related HTTP requests.
@@ -121,17 +158,45 @@ Handles health check endpoints.
 - `health_check()`: Returns the API health status
 - `version()`: Returns the API version information
 
-### Models Module (`src/models/`)
+### Models Module (`src/models/`) 📋
 
 #### user.rs
-Defines user-related data structures.
+Define estruturas de dados relacionadas ao usuário.
 
 **Structs:**
-- `User`: Main user entity with all user data
-- `CreateUserDto`: Data transfer object for user creation
-- `UpdateUserDto`: Data transfer object for user updates
-- `ChangePasswordDto`: Data transfer object for password changes
-- `UserResponse`: User data safe for API responses (excludes sensitive data)
+- `User`: Entidade principal do usuário com todos os dados
+- `CreateUserDto`: Objeto de transferência de dados para criação de usuário
+- `UpdateUserDto`: Objeto de transferência de dados para atualizações de usuário
+- `ChangePasswordDto`: Objeto de transferência de dados para alterações de senha
+- `UserResponse`: Dados do usuário seguros para respostas da API (exclui dados sensíveis)
+
+#### two_factor.rs
+Define estruturas de dados para autenticação de dois fatores.
+
+**Structs:**
+- `TwoFactorSetupResponse`: Resposta de configuração 2FA com QR code
+- `TwoFactorEnabledResponse`: Resposta de ativação 2FA com códigos de backup
+- `Enable2FADto`: Objeto para ativar 2FA
+- `Verify2FADto`: Objeto para verificar código TOTP
+- `Disable2FADto`: Objeto para desativar 2FA
+
+#### token.rs
+Define estruturas de dados para rotação de tokens JWT.
+
+**Structs:**
+- `TokenClaims`: Claims do token JWT com suporte a família de tokens
+- `BlacklistedToken`: Token na lista negra
+- `RefreshTokenDto`: Objeto para atualização de token
+
+#### keystroke_dynamics.rs
+Define estruturas de dados para análise de ritmo de digitação.
+
+**Structs:**
+- `KeystrokeDynamics`: Modelo para armazenar padrões de digitação
+- `RegisterKeystrokePatternDto`: Objeto para registrar padrões
+- `VerifyKeystrokePatternDto`: Objeto para verificar padrões
+- `KeystrokeVerificationResponse`: Resposta de verificação com similaridade
+- `KeystrokeStatusResponse`: Status da verificação de ritmo de digitação
 
 **Methods:**
 - `User::new()`: Creates a new user
@@ -263,33 +328,56 @@ Configures API routes and middleware.
 
 ## API Endpoints
 
-### Authentication Endpoints
-- `POST /api/auth/register`: Register a new user
-- `POST /api/auth/login`: Authenticate a user
-- `POST /api/auth/forgot-password`: Request password reset
-- `POST /api/auth/reset-password`: Reset password with token
-- `POST /api/auth/unlock`: Unlock a locked account
-- `POST /api/auth/refresh`: Refresh access token
-- `GET /api/auth/me`: Get current user info (requires authentication)
+### Authentication Endpoints 🔑
+- `POST /api/auth/register`: Registrar um novo usuário
+- `POST /api/auth/login`: Autenticar um usuário
+- `POST /api/auth/forgot-password`: Solicitar redefinição de senha
+- `POST /api/auth/reset-password`: Redefinir senha com token
+- `POST /api/auth/unlock`: Desbloquear uma conta bloqueada
+- `POST /api/auth/refresh`: Atualizar token de acesso
+- `GET /api/auth/me`: Obter informações do usuário atual (requer autenticação)
+- `POST /api/auth/token/rotate`: Rotacionar token JWT
+- `POST /api/auth/token/revoke`: Revogar token JWT
+- `POST /api/auth/revoke-all/{id}`: Revogar todos os tokens (logout de todos os dispositivos)
 
-### User Endpoints
-- `GET /api/users`: List all users (admin only)
-- `GET /api/users/{id}`: Get user by ID
-- `PUT /api/users/{id}`: Update user
-- `DELETE /api/users/{id}`: Delete user (admin only)
-- `POST /api/users/{id}/change-password`: Change user password
+### User Endpoints 👤
+- `GET /api/users`: Listar todos os usuários (somente admin)
+- `GET /api/users/{id}`: Obter usuário por ID
+- `PUT /api/users/{id}`: Atualizar usuário
+- `DELETE /api/users/{id}`: Excluir usuário (somente admin)
+- `POST /api/users/{id}/change-password`: Alterar senha do usuário
 
-### Health Check Endpoints
-- `GET /api/health`: Check API health
-- `GET /api/health/version`: Get API version
+### Two-Factor Authentication Endpoints 📱
+- `GET /api/users/{id}/2fa/setup`: Iniciar configuração 2FA
+- `POST /api/users/{id}/2fa/enable`: Ativar 2FA
+- `POST /api/users/{id}/2fa/disable`: Desativar 2FA
+- `POST /api/users/{id}/2fa/backup-codes`: Regenerar códigos de backup
+- `GET /api/users/{id}/2fa/status`: Verificar status do 2FA
 
-## Security Features
+### Keystroke Dynamics Endpoints 🎹
+- `POST /api/users/{id}/keystroke/register`: Registrar padrão de digitação
+- `POST /api/users/{id}/keystroke/verify`: Verificar padrão de digitação
+- `PUT /api/users/{id}/keystroke/toggle`: Habilitar/desabilitar verificação
+- `GET /api/users/{id}/keystroke/status`: Verificar status da verificação
 
-1. **JWT Authentication**: Secure token-based authentication
-2. **Password Hashing**: Secure password storage with bcrypt
-3. **Rate Limiting**: Protection against brute force attacks
-4. **Account Locking**: Automatic account locking after failed login attempts
-5. **CORS Protection**: Configurable cross-origin resource sharing
-6. **Refresh Tokens**: Secure token refresh mechanism
-7. **Admin Authorization**: Role-based access control
-8. **Email Verification**: Optional email verification for security actions
+### Health Check Endpoints ✅
+- `GET /api/health`: Verificar saúde da API
+- `GET /api/health/version`: Obter versão da API
+
+### Admin Endpoints 👑
+- `POST /api/admin/clean-tokens`: Limpar tokens expirados da lista negra
+
+## Security Features 🔒
+
+1. **JWT Authentication**: Autenticação segura baseada em tokens
+2. **Password Hashing**: Armazenamento seguro de senhas com bcrypt e Argon2
+3. **Rate Limiting**: Proteção contra ataques de força bruta
+4. **Account Locking**: Bloqueio automático de conta após tentativas de login malsucedidas
+5. **CORS Protection**: Política de compartilhamento de recursos entre origens configurável
+6. **Refresh Tokens**: Mecanismo seguro de atualização de tokens
+7. **Admin Authorization**: Controle de acesso baseado em funções
+8. **Email Verification**: Verificação opcional de email para ações de segurança
+9. **Two-Factor Authentication (2FA)**: Autenticação de dois fatores com TOTP e códigos de backup
+10. **Token Rotation**: Rotação de tokens JWT com invalidação baseada em família
+11. **Token Blacklist**: Lista negra de tokens para revogação imediata
+12. **Keystroke Dynamics**: Análise de ritmo de digitação para verificação biométrica comportamental

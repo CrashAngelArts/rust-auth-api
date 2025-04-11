@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo de Ritmo de Digitação 🎹</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        h1, h2 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="password"], input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+            border-left: 4px solid #3498db;
+        }
+        .pattern-display {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 10px;
+        }
+        .pattern-item {
+            background-color: #3498db;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .visualization {
+            height: 150px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-top: 15px;
+            position: relative;
+            overflow: hidden;
+        }
+        .bar {
+            position: absolute;
+            bottom: 0;
+            width: 10px;
+            background-color: #3498db;
+            transition: height 0.3s;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 15px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .success {
+            background-color: #2ecc71;
+            color: white;
+        }
+        .warning {
+            background-color: #f39c12;
+            color: white;
+        }
+        .error {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+        }
+        .tab.active {
+            border-bottom: 3px solid #3498db;
+            font-weight: bold;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>Demo de Ritmo de Digitação 🎹</h1>
+    <p style="text-align: center;">Uma nova camada de segurança que analisa seu padrão único de digitação</p>
+    
+    <div class="tabs">
+        <div class="tab active" data-tab="register">Registrar Padrão</div>
+        <div class="tab" data-tab="verify">Verificar Padrão</div>
+        <div class="tab" data-tab="about">Sobre a Tecnologia</div>
+    </div>
+    
+    <div id="register" class="tab-content active">
+        <div class="container">
+            <h2>Registrar Seu Padrão de Digitação 📝</h2>
+            <div class="input-group">
+                <label for="userId">ID do Usuário:</label>
+                <input type="text" id="userId" placeholder="Digite o ID do usuário">
+            </div>
+            <div class="input-group">
+                <label for="password">Senha de Exemplo:</label>
+                <input type="password" id="registerPassword" placeholder="Digite uma senha para registrar seu padrão">
+            </div>
+            <div class="input-group">
+                <label for="threshold">Limiar de Similaridade (%):</label>
+                <input type="number" id="threshold" min="50" max="100" value="80">
+                <small>Quanto maior o valor, mais precisa deve ser a digitação</small>
+            </div>
+            <button id="registerBtn">Registrar Padrão ✅</button>
+            
+            <div id="registerResult" class="result" style="display: none;">
+                <h3>Padrão Capturado:</h3>
+                <div id="patternDisplay" class="pattern-display"></div>
+                
+                <h3>Visualização:</h3>
+                <div id="visualization" class="visualization"></div>
+                
+                <div id="registerStatus" class="status"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="verify" class="tab-content">
+        <div class="container">
+            <h2>Verificar Seu Padrão de Digitação 🔍</h2>
+            <div class="input-group">
+                <label for="verifyUserId">ID do Usuário:</label>
+                <input type="text" id="verifyUserId" placeholder="Digite o ID do usuário">
+            </div>
+            <div class="input-group">
+                <label for="verifyPassword">Senha:</label>
+                <input type="password" id="verifyPassword" placeholder="Digite sua senha para verificar o padrão">
+            </div>
+            <button id="verifyBtn">Verificar Padrão 🔐</button>
+            
+            <div id="verifyResult" class="result" style="display: none;">
+                <h3>Resultado da Verificação:</h3>
+                <div id="verifyPatternDisplay" class="pattern-display"></div>
+                
+                <h3>Visualização:</h3>
+                <div id="verifyVisualization" class="visualization"></div>
+                
+                <div id="verifyStatus" class="status"></div>
+                <div id="similarityResult"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="about" class="tab-content">
+        <div class="container">
+            <h2>Sobre a Tecnologia de Ritmo de Digitação 🔒</h2>
+            <p>A análise de ritmo de digitação (keystroke dynamics) é uma forma de biometria comportamental que identifica usuários com base em seu padrão único de digitação.</p>
+            
+            <h3>Como Funciona? 🤔</h3>
+            <p>Quando você digita, o sistema captura:</p>
+            <ul>
+                <li>O tempo entre cada tecla pressionada</li>
+                <li>A velocidade geral de digitação</li>
+                <li>Padrões rítmicos únicos</li>
+            </ul>
+            
+            <h3>Vantagens 🌟</h3>
+            <ul>
+                <li>Camada extra de segurança além da senha</li>
+                <li>Difícil de falsificar ou replicar</li>
+                <li>Não requer hardware adicional</li>
+                <li>Funciona continuamente durante a sessão</li>
+            </ul>
+            
+            <h3>Aplicações 🚀</h3>
+            <ul>
+                <li>Autenticação multifator</li>
+                <li>Detecção de fraudes</li>
+                <li>Verificação contínua de identidade</li>
+                <li>Proteção contra ataques de força bruta</li>
+            </ul>
+            
+            <p style="font-style: italic; text-align: center; margin-top: 20px;">
+                "Tão único quanto sua impressão digital, seu ritmo de digitação é uma assinatura comportamental que só você possui."
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Variáveis para armazenar os tempos de digitação
+        let keyDownTimes = {};
+        let keyUpTimes = {};
+        let typingPattern = [];
+        let apiBaseUrl = 'http://localhost:8080/api';
+        
+        // Função para alternar entre as abas
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remover classe active de todas as abas
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                // Adicionar classe active à aba clicada
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+            });
+        });
+        
+        // Registrar eventos de teclado para o campo de senha de registro
+        const registerPasswordInput = document.getElementById('registerPassword');
+        registerPasswordInput.addEventListener('keydown', function(e) {
+            keyDownTimes[e.key] = Date.now();
+        });
+        
+        registerPasswordInput.addEventListener('keyup', function(e) {
+            if (keyDownTimes[e.key]) {
+                const keyUpTime = Date.now();
+                const keyDownTime = keyDownTimes[e.key];
+                const timeBetween = keyUpTime - keyDownTime;
+                
+                // Armazenar o tempo entre keydown e keyup
+                keyUpTimes[e.key] = keyUpTime;
+                
+                // Se não for a primeira tecla, calcular o tempo entre a tecla anterior e esta
+                if (Object.keys(keyUpTimes).length > 1) {
+                    const keys = Object.keys(keyUpTimes);
+                    const previousKey = keys[keys.length - 2];
+                    const timeBetweenKeys = keyDownTime - keyUpTimes[previousKey];
+                    
+                    // Adicionar ao padrão de digitação (em milissegundos)
+                    typingPattern.push(timeBetweenKeys);
+                }
+            }
+        });
+        
+        // Função para registrar o padrão
+        document.getElementById('registerBtn').addEventListener('click', async function() {
+            const userId = document.getElementById('userId').value;
+            const threshold = parseInt(document.getElementById('threshold').value);
+            
+            if (!userId) {
+                alert('Por favor, digite o ID do usuário! 😊');
+                return;
+            }
+            
+            if (typingPattern.length < 2) {
+                alert('Por favor, digite uma senha mais longa para capturar um padrão adequado! 😊');
+                return;
+            }
+            
+            // Exibir o padrão capturado
+            displayPattern(typingPattern, 'patternDisplay', 'visualization');
+            
+            // Simular envio para a API (em uma implementação real, isso seria uma chamada real)
+            try {
+                const response = await fetch(`${apiBaseUrl}/users/${userId}/keystroke/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        typing_pattern: typingPattern,
+                        similarity_threshold: threshold
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('registerStatus').textContent = 'Padrão registrado com sucesso! 🎉';
+                    document.getElementById('registerStatus').className = 'status success';
+                } else {
+                    throw new Error('Erro ao registrar padrão');
+                }
+            } catch (error) {
+                // Simular sucesso para fins de demonstração
+                document.getElementById('registerStatus').textContent = 'Padrão registrado com sucesso! (Simulado) 🎉';
+                document.getElementById('registerStatus').className = 'status success';
+                console.error('Erro:', error);
+            }
+            
+            document.getElementById('registerResult').style.display = 'block';
+        });
+        
+        // Registrar eventos de teclado para o campo de senha de verificação
+        const verifyPasswordInput = document.getElementById('verifyPassword');
+        let verifyTypingPattern = [];
+        let verifyKeyDownTimes = {};
+        let verifyKeyUpTimes = {};
+        
+        verifyPasswordInput.addEventListener('keydown', function(e) {
+            verifyKeyDownTimes[e.key] = Date.now();
+        });
+        
+        verifyPasswordInput.addEventListener('keyup', function(e) {
+            if (verifyKeyDownTimes[e.key]) {
+                const keyUpTime = Date.now();
+                const keyDownTime = verifyKeyDownTimes[e.key];
+                
+                // Armazenar o tempo entre keydown e keyup
+                verifyKeyUpTimes[e.key] = keyUpTime;
+                
+                // Se não for a primeira tecla, calcular o tempo entre a tecla anterior e esta
+                if (Object.keys(verifyKeyUpTimes).length > 1) {
+                    const keys = Object.keys(verifyKeyUpTimes);
+                    const previousKey = keys[keys.length - 2];
+                    const timeBetweenKeys = keyDownTime - verifyKeyUpTimes[previousKey];
+                    
+                    // Adicionar ao padrão de digitação (em milissegundos)
+                    verifyTypingPattern.push(timeBetweenKeys);
+                }
+            }
+        });
+        
+        // Função para verificar o padrão
+        document.getElementById('verifyBtn').addEventListener('click', async function() {
+            const userId = document.getElementById('verifyUserId').value;
+            
+            if (!userId) {
+                alert('Por favor, digite o ID do usuário! 😊');
+                return;
+            }
+            
+            if (verifyTypingPattern.length < 2) {
+                alert('Por favor, digite uma senha mais longa para capturar um padrão adequado! 😊');
+                return;
+            }
+            
+            // Exibir o padrão capturado
+            displayPattern(verifyTypingPattern, 'verifyPatternDisplay', 'verifyVisualization');
+            
+            // Simular envio para a API (em uma implementação real, isso seria uma chamada real)
+            try {
+                const response = await fetch(`${apiBaseUrl}/users/${userId}/keystroke/verify`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        typing_pattern: verifyTypingPattern
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    showVerificationResult(data.data);
+                } else {
+                    throw new Error('Erro ao verificar padrão');
+                }
+            } catch (error) {
+                // Simular resultado para fins de demonstração
+                const similarity = Math.floor(Math.random() * 30) + 70; // Entre 70% e 100%
+                const threshold = 80;
+                
+                showVerificationResult({
+                    accepted: similarity >= threshold,
+                    similarity_percentage: similarity,
+                    threshold: threshold,
+                    message: similarity >= threshold 
+                        ? `Padrão aceito com ${similarity}% de similaridade! 🎉` 
+                        : `Padrão rejeitado. Similaridade: ${similarity}%, Limiar: ${threshold}% ❌`
+                });
+                
+                console.error('Erro:', error);
+            }
+            
+            document.getElementById('verifyResult').style.display = 'block';
+        });
+        
+        // Função para exibir o padrão de digitação
+        function displayPattern(pattern, displayElementId, visualizationElementId) {
+            const displayElement = document.getElementById(displayElementId);
+            const visualizationElement = document.getElementById(visualizationElementId);
+            
+            // Limpar elementos
+            displayElement.innerHTML = '';
+            visualizationElement.innerHTML = '';
+            
+            // Exibir valores numéricos
+            pattern.forEach(time => {
+                const item = document.createElement('div');
+                item.className = 'pattern-item';
+                item.textContent = `${time}ms`;
+                displayElement.appendChild(item);
+            });
+            
+            // Criar visualização
+            const maxTime = Math.max(...pattern);
+            const barWidth = visualizationElement.clientWidth / pattern.length;
+            
+            pattern.forEach((time, index) => {
+                const bar = document.createElement('div');
+                bar.className = 'bar';
+                bar.style.left = `${index * barWidth}px`;
+                bar.style.width = `${barWidth - 2}px`;
+                
+                // Altura proporcional ao tempo (máximo 90% da altura do container)
+                const height = (time / maxTime) * 90;
+                bar.style.height = `${height}%`;
+                
+                visualizationElement.appendChild(bar);
+            });
+        }
+        
+        // Função para mostrar o resultado da verificação
+        function showVerificationResult(result) {
+            const statusElement = document.getElementById('verifyStatus');
+            const similarityElement = document.getElementById('similarityResult');
+            
+            statusElement.textContent = result.message;
+            statusElement.className = `status ${result.accepted ? 'success' : 'error'}`;
+            
+            similarityElement.innerHTML = `
+                <p><strong>Similaridade:</strong> ${result.similarity_percentage.toFixed(1)}%</p>
+                <p><strong>Limiar configurado:</strong> ${result.threshold}%</p>
+                <p><strong>Resultado:</strong> ${result.accepted ? 'Autenticado ✅' : 'Rejeitado ❌'}</p>
+            `;
+        }
+    </script>
+</body>
+</html>
