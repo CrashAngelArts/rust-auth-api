@@ -3,7 +3,7 @@ use crate::models::user::User;
 use lettre::message::{header, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message, SmtpTransport, Transport};
-use log::info; // Remover 'error' que não está sendo usado diretamente aqui
+use tracing::info; // Usar tracing em vez de log
 
 #[derive(Clone)]
 pub struct EmailService {

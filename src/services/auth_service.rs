@@ -11,7 +11,7 @@ use crate::services::user_service::UserService;
 use chrono::{Duration, Utc};
 use hex;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
-use log::{error, info, warn};
+use tracing::{error, info, warn};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use sha2::{Digest, Sha256};

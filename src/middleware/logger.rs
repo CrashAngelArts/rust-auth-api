@@ -4,7 +4,7 @@ use actix_web::{
 };
 use futures::future::{ready, Ready};
 use futures::Future;
-use log::{debug, info};
+use tracing::{debug, info};
 use std::{
     pin::Pin,
     rc::Rc,

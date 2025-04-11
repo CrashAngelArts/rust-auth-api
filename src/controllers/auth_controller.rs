@@ -9,7 +9,7 @@ use crate::models::response::ApiResponse;
 use crate::models::user::UserResponse;
 use crate::services::{auth_service::AuthService, email_service::EmailService, user_service::UserService};
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
-use log::error;
+use tracing::{error, warn};
 use validator::Validate;
 
 // Registra um novo usuário
@@ -123,7 +123,7 @@ pub async fn forgot_password(
         // Usar .await na chamada assíncrona
         AuthService::forgot_password(&pool, forgot_dto.into_inner(), &email_service).await?;
     } else {
-        log::warn!("⚠️ Tentativa de recuperação de senha com emails desabilitados.");
+        warn!("⚠️ Tentativa de recuperação de senha com emails desabilitados.");
         // Retornar a mesma mensagem genérica para não vazar informação
     }
 

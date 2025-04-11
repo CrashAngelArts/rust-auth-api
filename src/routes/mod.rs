@@ -12,7 +12,7 @@ use crate::middleware::{
     rate_limiter::RateLimiter,
 };
 use actix_web::{web, HttpResponse};
-use log::info;
+use tracing::info;
 
 // Configura as rotas da API
 pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {

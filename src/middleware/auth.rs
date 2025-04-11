@@ -7,7 +7,7 @@ use actix_web::{
 };
 use futures::future::{ready, Ready, LocalBoxFuture};
 
-use log::warn;
+use tracing::warn;
 use std::rc::Rc;
 
 // Middleware para autenticação JWT

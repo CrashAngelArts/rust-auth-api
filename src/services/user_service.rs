@@ -3,8 +3,10 @@ use crate::errors::ApiError;
 use crate::models::user::{ChangePasswordDto, CreateUserDto, UpdateUserDto, User, UserResponse};
 use crate::utils::password::check_password_strength;
 use bcrypt::{hash, verify};
+use crate::utils::password_argon2;
 use chrono::Utc;
-use log::info;
+use std::env;
+use tracing::info;
 
 pub struct UserService;
 
@@ -18,6 +20,11 @@ impl UserService {
         user_dto: CreateUserDto,
         salt_rounds: u32,
     ) -> Result<User, ApiError> {
+        // Verifica se deve usar Argon2 ou bcrypt
+        let use_argon2 = env::var("USE_ARGON2")
+            .unwrap_or_else(|_| "false".to_string())
+            .parse::<bool>()
+            .unwrap_or(false);
         let conn = pool.get()?;
 
         // Verifica se o email já está em uso
@@ -49,8 +56,13 @@ impl UserService {
             return Err(ApiError::BadRequestError(error_message));
         }
 
-        // Cria o hash da senha
-        let password_hash = hash(user_dto.password, salt_rounds)?;
+        // Cria o hash da senha usando Argon2 ou bcrypt
+        let password_hash = if use_argon2 {
+            password_argon2::hash_password(&user_dto.password)
+                .map_err(|e| ApiError::InternalServerError(e))?
+        } else {
+            hash(user_dto.password, salt_rounds)?
+        };
 
         // Cria o usuário (com valores padrão para os novos campos)
         let user = User::new(
@@ -339,6 +351,11 @@ impl UserService {
         change_dto: ChangePasswordDto,
         salt_rounds: u32,
     ) -> Result<(), ApiError> {
+        // Verifica se deve usar Argon2 ou bcrypt
+        let use_argon2 = env::var("USE_ARGON2")
+            .unwrap_or_else(|_| "false".to_string())
+            .parse::<bool>()
+            .unwrap_or(false);
         let conn = pool.get()?;
 
         // Obtém o usuário
@@ -356,8 +373,13 @@ impl UserService {
             return Err(ApiError::BadRequestError(error_message));
         }
 
-        // Cria o hash da nova senha
-        let password_hash = hash(&change_dto.new_password, salt_rounds)?;
+        // Cria o hash da nova senha usando Argon2 ou bcrypt
+        let password_hash = if use_argon2 {
+            password_argon2::hash_password(&change_dto.new_password)
+                .map_err(|e| ApiError::InternalServerError(e))?
+        } else {
+            hash(&change_dto.new_password, salt_rounds)?
+        };
 
         // Atualiza a senha
         conn.execute(
@@ -376,6 +398,11 @@ impl UserService {
         new_password: &str,
         salt_rounds: u32,
     ) -> Result<(), ApiError> {
+        // Verifica se deve usar Argon2 ou bcrypt
+        let use_argon2 = env::var("USE_ARGON2")
+            .unwrap_or_else(|_| "false".to_string())
+            .parse::<bool>()
+            .unwrap_or(false);
         let conn = pool.get()?;
 
         // Obtém o usuário
@@ -388,8 +415,13 @@ impl UserService {
             return Err(ApiError::BadRequestError(error_message));
         }
 
-        // Cria o hash da nova senha
-        let password_hash = hash(new_password, salt_rounds)?;
+        // Cria o hash da nova senha usando Argon2 ou bcrypt
+        let password_hash = if use_argon2 {
+            password_argon2::hash_password(new_password)
+                .map_err(|e| ApiError::InternalServerError(e))?
+        } else {
+            hash(new_password, salt_rounds)?
+        };
 
         // Atualiza a senha
         conn.execute(
@@ -417,6 +449,14 @@ impl UserService {
 
     // Verifica se a senha é válida
     pub fn verify_password(password: &str, password_hash: &str) -> Result<bool, ApiError> {
-        Ok(verify(password, password_hash)?)
+        // Verifica se o hash é do tipo Argon2
+        if password_argon2::is_argon2_hash(password_hash) {
+            // Usa verificação Argon2
+            password_argon2::verify_password(password, password_hash)
+                .map_err(|e| ApiError::InternalServerError(e))
+        } else {
+            // Usa verificação bcrypt
+            Ok(verify(password, password_hash)?)
+        }
     }
 }

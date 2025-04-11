@@ -6,7 +6,7 @@ use actix_web::{
 };
 use futures::future::{ready, Ready};
 use futures::Future;
-use log::error;
+use tracing::error;
 use std::{
     pin::Pin,
     rc::Rc,

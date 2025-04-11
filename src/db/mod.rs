@@ -9,7 +9,7 @@ use r2d2_sqlite::SqliteConnectionManager;
 use refinery_macros::embed_migrations;
 use rusqlite::Connection;
 use std::path::Path;
-use log::info; // Adicionar log
+use tracing::info; // Usar tracing em vez de log
 
 // Incorpora as migrações SQL do diretório 'migrations'
 embed_migrations!("migrations");

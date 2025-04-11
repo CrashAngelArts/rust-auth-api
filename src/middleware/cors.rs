@@ -1,7 +1,7 @@
 use actix_cors::Cors;
 use actix_web::http::header;
 use crate::config::Config;
-use log::info;
+use tracing::info;
 
 // Configura o CORS para a aplicação
 pub fn configure_cors(config: &Config) -> Cors {

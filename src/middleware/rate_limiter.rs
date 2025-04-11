@@ -4,7 +4,7 @@ use actix_web::{
 };
 use futures::future::{ready, Ready};
 use futures::Future;
-use log::warn;
+use tracing::warn;
 use std::{
     collections::HashMap,
     pin::Pin,

@@ -2,6 +2,7 @@ use actix_web::{http::StatusCode, HttpResponse, ResponseError};
 use serde::Serialize;
 use std::collections::HashMap; // Importar HashMap
 use thiserror::Error;
+use tracing::{error, warn};
 use validator::ValidationErrors;
 
 #[derive(Error, Debug)]
@@ -112,7 +113,7 @@ impl From<rusqlite::Error> for ApiError {
         if let rusqlite::Error::SqliteFailure(ref err, Some(ref msg)) = error {
             if err.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE && msg.contains("unlock_token") {
                 // Tentar gerar um novo token é complexo aqui, melhor logar e retornar erro genérico
-                log::error!("Erro de constraint UNIQUE ao gerar unlock_token: {}", error);
+                error!("Erro de constraint UNIQUE ao gerar unlock_token: {}", error);
                 return ApiError::InternalServerError("Não foi possível gerar um token de desbloqueio único. Tente novamente.".to_string());
             }
         }
@@ -174,10 +175,10 @@ impl From<ValidationErrors> for ApiError {
 pub fn log_error(error: &ApiError) {
     match error {
         ApiError::InternalServerError(msg) | ApiError::DatabaseError(msg) | ApiError::EmailError(msg) => {
-            log::error!("{}", msg);
+            error!("{}", msg);
         }
         _ => {
-            log::warn!("{}", error);
+            warn!("{}", error);
         }
     }
 }

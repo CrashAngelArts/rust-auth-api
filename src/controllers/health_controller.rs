@@ -2,7 +2,7 @@ use crate::db::DbPool;
 use crate::errors::ApiError;
 use crate::models::response::ApiResponse;
 use actix_web::{web, HttpResponse, Responder};
-use log::info;
+use tracing::info;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
