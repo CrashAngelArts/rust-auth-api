@@ -127,6 +127,44 @@
         .tab-content.active {
             display: block;
         }
+        
+        /* Estilos para o cronômetro */
+        .timer {
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            margin: 15px 0;
+            color: #2c3e50;
+        }
+        .timer .ms {
+            font-size: 18px;
+            color: #7f8c8d;
+        }
+        
+        /* Estilos para o indicador LED */
+        .led-container {
+            display: flex;
+            justify-content: center;
+            margin: 10px 0;
+        }
+        .led {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: #ddd;
+            margin: 0 5px;
+            transition: background-color 0.1s;
+        }
+        .led.active {
+            background-color: #2ecc71;
+            box-shadow: 0 0 10px #2ecc71;
+            animation: pulse 0.5s;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
     </style>
 </head>
 <body>
@@ -146,6 +184,12 @@
                 <label for="userId">ID do Usuário:</label>
                 <input type="text" id="userId" placeholder="Digite o ID do usuário">
             </div>
+            
+            <div class="led-container">
+                <div class="led" id="registerLed"></div>
+            </div>
+            
+            <div class="timer" id="registerTimer">00:00:<span class="ms">000</span></div>
             <div class="input-group">
                 <label for="password">Senha de Exemplo:</label>
                 <input type="password" id="registerPassword" placeholder="Digite uma senha para registrar seu padrão">
@@ -180,6 +224,12 @@
                 <label for="verifyPassword">Senha:</label>
                 <input type="password" id="verifyPassword" placeholder="Digite sua senha para verificar o padrão">
             </div>
+            
+            <div class="led-container">
+                <div class="led" id="verifyLed"></div>
+            </div>
+            
+            <div class="timer" id="verifyTimer">00:00:00</div>
             <button id="verifyBtn">Verificar Padrão 🔐</button>
             
             <div id="verifyResult" class="result" style="display: none;">
@@ -237,6 +287,16 @@
         let typingPattern = [];
         let apiBaseUrl = 'http://localhost:8080/api';
         
+        // Variáveis para o cronômetro
+        let registerKeyPressStartTime = null;
+        let verifyKeyPressStartTime = null;
+        let registerTotalTime = 0;
+        let verifyTotalTime = 0;
+        let registerKeyPressed = false;
+        let verifyKeyPressed = false;
+        let registerTimerInterval = null;
+        let verifyTimerInterval = null;
+        
         // Função para alternar entre as abas
         document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', () => {
@@ -252,7 +312,22 @@
         
         // Registrar eventos de teclado para o campo de senha de registro
         const registerPasswordInput = document.getElementById('registerPassword');
+        const registerLed = document.getElementById('registerLed');
+        const registerTimer = document.getElementById('registerTimer');
+        
         registerPasswordInput.addEventListener('keydown', function(e) {
+            // Iniciar cronômetro quando a tecla é pressionada
+            registerKeyPressStartTime = Date.now();
+            registerKeyPressed = true;
+            
+            // Iniciar o timer se ainda não estiver rodando
+            if (!registerTimerInterval) {
+                startRegisterTimer();
+            }
+            
+            // Ativar LED
+            registerLed.classList.add('active');
+            
             keyDownTimes[e.key] = Date.now();
         });
         
@@ -261,6 +336,20 @@
                 const keyUpTime = Date.now();
                 const keyDownTime = keyDownTimes[e.key];
                 const timeBetween = keyUpTime - keyDownTime;
+                
+                // Adicionar o tempo desta tecla ao total
+                if (registerKeyPressStartTime) {
+                    registerTotalTime += (keyUpTime - registerKeyPressStartTime);
+                    registerKeyPressStartTime = null;
+                }
+                
+                // Marcar que nenhuma tecla está pressionada
+                registerKeyPressed = false;
+                
+                // Desativar LED após um curto período
+                setTimeout(() => {
+                    registerLed.classList.remove('active');
+                }, 100);
                 
                 // Armazenar o tempo entre keydown e keyup
                 keyUpTimes[e.key] = keyUpTime;
@@ -281,6 +370,15 @@
         document.getElementById('registerBtn').addEventListener('click', async function() {
             const userId = document.getElementById('userId').value;
             const threshold = parseInt(document.getElementById('threshold').value);
+            
+            // Parar o cronômetro
+            if (registerTimerInterval) {
+                clearInterval(registerTimerInterval);
+                registerTimerInterval = null;
+                
+                // Exibir o tempo total final
+                updateRegisterTimer(registerTotalTime);
+            }
             
             if (!userId) {
                 alert('Por favor, digite o ID do usuário! 😊');
@@ -327,11 +425,25 @@
         
         // Registrar eventos de teclado para o campo de senha de verificação
         const verifyPasswordInput = document.getElementById('verifyPassword');
+        const verifyLed = document.getElementById('verifyLed');
+        const verifyTimer = document.getElementById('verifyTimer');
         let verifyTypingPattern = [];
         let verifyKeyDownTimes = {};
         let verifyKeyUpTimes = {};
         
         verifyPasswordInput.addEventListener('keydown', function(e) {
+            // Iniciar cronômetro quando a tecla é pressionada
+            verifyKeyPressStartTime = Date.now();
+            verifyKeyPressed = true;
+            
+            // Iniciar o timer se ainda não estiver rodando
+            if (!verifyTimerInterval) {
+                startVerifyTimer();
+            }
+            
+            // Ativar LED
+            verifyLed.classList.add('active');
+            
             verifyKeyDownTimes[e.key] = Date.now();
         });
         
@@ -339,6 +451,20 @@
             if (verifyKeyDownTimes[e.key]) {
                 const keyUpTime = Date.now();
                 const keyDownTime = verifyKeyDownTimes[e.key];
+                
+                // Adicionar o tempo desta tecla ao total
+                if (verifyKeyPressStartTime) {
+                    verifyTotalTime += (keyUpTime - verifyKeyPressStartTime);
+                    verifyKeyPressStartTime = null;
+                }
+                
+                // Marcar que nenhuma tecla está pressionada
+                verifyKeyPressed = false;
+                
+                // Desativar LED após um curto período
+                setTimeout(() => {
+                    verifyLed.classList.remove('active');
+                }, 100);
                 
                 // Armazenar o tempo entre keydown e keyup
                 verifyKeyUpTimes[e.key] = keyUpTime;
@@ -358,6 +484,15 @@
         // Função para verificar o padrão
         document.getElementById('verifyBtn').addEventListener('click', async function() {
             const userId = document.getElementById('verifyUserId').value;
+            
+            // Parar o cronômetro
+            if (verifyTimerInterval) {
+                clearInterval(verifyTimerInterval);
+                verifyTimerInterval = null;
+                
+                // Exibir o tempo total final
+                updateVerifyTimer(verifyTotalTime);
+            }
             
             if (!userId) {
                 alert('Por favor, digite o ID do usuário! 😊');
@@ -458,6 +593,63 @@
                 <p><strong>Limiar configurado:</strong> ${result.threshold}%</p>
                 <p><strong>Resultado:</strong> ${result.accepted ? 'Autenticado ✅' : 'Rejeitado ❌'}</p>
             `;
+        }
+        
+        // Função para iniciar o cronômetro de registro
+        function startRegisterTimer() {
+            registerTimerInterval = setInterval(() => {
+                // Atualizar o cronômetro apenas se uma tecla estiver pressionada
+                if (registerKeyPressed && registerKeyPressStartTime) {
+                    const currentKeyPressDuration = Date.now() - registerKeyPressStartTime;
+                    const totalTime = registerTotalTime + currentKeyPressDuration;
+                    updateRegisterTimer(totalTime);
+                }
+            }, 10);
+        }
+        
+        // Função para atualizar o display do cronômetro de registro
+        function updateRegisterTimer(totalMilliseconds) {
+            const timeFormatted = formatTime(totalMilliseconds);
+            const [minutes, seconds, ms] = timeFormatted.split(':');
+            registerTimer.innerHTML = `${minutes}:${seconds}:<span class="ms">${ms}</span>`;
+        }
+        
+        // Função para iniciar o cronômetro de verificação
+        function startVerifyTimer() {
+            verifyTimerInterval = setInterval(() => {
+                // Atualizar o cronômetro apenas se uma tecla estiver pressionada
+                if (verifyKeyPressed && verifyKeyPressStartTime) {
+                    const currentKeyPressDuration = Date.now() - verifyKeyPressStartTime;
+                    const totalTime = verifyTotalTime + currentKeyPressDuration;
+                    updateVerifyTimer(totalTime);
+                }
+            }, 10);
+        }
+        
+        // Função para atualizar o display do cronômetro de verificação
+        function updateVerifyTimer(totalMilliseconds) {
+            const timeFormatted = formatTime(totalMilliseconds);
+            const [minutes, seconds, ms] = timeFormatted.split(':');
+            verifyTimer.innerHTML = `${minutes}:${seconds}:<span class="ms">${ms}</span>`;
+        }
+        
+        // Função para formatar o tempo em MM:SS:MSS
+        function formatTime(milliseconds) {
+            const ms = Math.floor(milliseconds % 1000);
+            const seconds = Math.floor((milliseconds / 1000) % 60);
+            const minutes = Math.floor((milliseconds / (1000 * 60)) % 60);
+            
+            return `${padZero(minutes)}:${padZero(seconds)}:${padZero3(ms)}`;
+        }
+        
+        // Função para adicionar zeros à esquerda (3 dígitos)
+        function padZero3(num) {
+            return num.toString().padStart(3, '0');
+        }
+        
+        // Função para adicionar zero à esquerda
+        function padZero(num) {
+            return num.toString().padStart(2, '0');
         }
     </script>
 </body>
