@@ -11,7 +11,7 @@ use tracing::info;
 pub struct UserService;
 
 // Colunas base para buscar um usuário completo
-const USER_COLUMNS: &str = "id, email, username, password_hash, first_name, last_name, is_active, is_admin, created_at, updated_at, failed_login_attempts, locked_until, unlock_token, unlock_token_expires_at";
+const USER_COLUMNS: &str = "id, email, username, password_hash, first_name, last_name, is_active, is_admin, created_at, updated_at, failed_login_attempts, locked_until, unlock_token, unlock_token_expires_at, totp_secret, totp_enabled, backup_codes, token_family";
 
 impl UserService {
     // Cria um novo usuário
@@ -122,6 +122,10 @@ impl UserService {
                     locked_until: row.get(11)?,          // Mapear novo campo
                     unlock_token: row.get(12)?,          // Mapear novo campo
                     unlock_token_expires_at: row.get(13)?, // Mapear novo campo
+                    totp_secret: row.get(14)?,          // Campo para 2FA
+                    totp_enabled: row.get(15)?,         // Campo para 2FA
+                    backup_codes: row.get(16)?,         // Campo para 2FA
+                    token_family: row.get(17)?,         // Campo para rotação de tokens
                 })
             },
         ).map_err(|e| match e {
@@ -155,6 +159,10 @@ impl UserService {
                     locked_until: row.get(11)?,
                     unlock_token: row.get(12)?,
                     unlock_token_expires_at: row.get(13)?,
+                    totp_secret: row.get(14)?,          // Campo para 2FA
+                    totp_enabled: row.get(15)?,         // Campo para 2FA
+                    backup_codes: row.get(16)?,         // Campo para 2FA
+                    token_family: row.get(17)?,         // Campo para rotação de tokens
                 })
             },
         ).map_err(|e| match e {
@@ -221,6 +229,10 @@ impl UserService {
                     locked_until: row.get(11)?,
                     unlock_token: row.get(12)?,
                     unlock_token_expires_at: row.get(13)?,
+                    totp_secret: row.get(14)?,          // Campo para 2FA
+                    totp_enabled: row.get(15)?,         // Campo para 2FA
+                    backup_codes: row.get(16)?,         // Campo para 2FA
+                    token_family: row.get(17)?,         // Campo para rotação de tokens
                 })
             },
         ).map_err(|e| match e {

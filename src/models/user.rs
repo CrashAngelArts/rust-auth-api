@@ -24,6 +24,15 @@ pub struct User {
     pub unlock_token: Option<String>,
     #[serde(skip_serializing)] // Não expor a expiração do token
     pub unlock_token_expires_at: Option<DateTime<Utc>>,
+    // Campos para autenticação de dois fatores (2FA)
+    #[serde(skip_serializing)] // Não expor o segredo TOTP
+    pub totp_secret: Option<String>,
+    pub totp_enabled: bool,
+    #[serde(skip_serializing)] // Não expor os códigos de backup
+    pub backup_codes: Option<String>,
+    // Campo para rotação de tokens JWT
+    #[serde(skip_serializing)] // Não expor a família de tokens
+    pub token_family: Option<String>,
 }
 
 impl User {
@@ -50,6 +59,10 @@ impl User {
             locked_until: None,       // Inicializa como não bloqueado
             unlock_token: None,       // Inicializa sem token
             unlock_token_expires_at: None, // Inicializa sem expiração de token
+            totp_secret: None,        // Inicializa sem segredo TOTP
+            totp_enabled: false,      // 2FA desabilitado por padrão
+            backup_codes: None,       // Inicializa sem códigos de backup
+            token_family: Some(Uuid::new_v4().to_string()), // Cria uma nova família de tokens
         }
     }
 

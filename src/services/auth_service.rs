@@ -411,6 +411,10 @@ impl AuthService {
                     locked_until: row.get(11)?,
                     unlock_token: row.get(12)?,
                     unlock_token_expires_at: row.get(13)?,
+                    totp_secret: row.get(14)?,          // Campo para 2FA
+                    totp_enabled: row.get(15)?,         // Campo para 2FA
+                    backup_codes: row.get(16)?,         // Campo para 2FA
+                    token_family: row.get(17)?,         // Campo para rotação de tokens
                 })
             },
         );

@@ -30,6 +30,10 @@ hex = "0.4"   # Para codificar/decodificar hash
 csrf = "0.4.0"  # Proteção contra CSRF
 actix-web-httpauth = "0.8.0"  # Autenticação HTTP
 argon2 = "0.5.0"  # Algoritmo de hashing mais seguro que bcrypt
+totp-rs = "5.6.0"  # Para implementação de 2FA/TOTP
+qrcode = "0.12.0"  # Para gerar QR codes para 2FA
+base32 = "0.4.0"  # Para codificação base32 usada em 2FA
+base64 = "0.21.0"  # Para codificação base64
 
 # Serialização/Deserialização
 serde = { version = "1.0.188", features = ["derive"] }

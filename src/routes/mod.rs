@@ -3,6 +3,8 @@ use crate::controllers::{
     auth_controller,
     health_controller,
     user_controller,
+    two_factor_controller,
+    token_controller,
 };
 use crate::middleware::{
     auth::{AdminAuth, JwtAuth},
@@ -44,12 +46,16 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
                     .route("/reset-password", web::post().to(auth_controller::reset_password))
                     .route("/unlock", web::post().to(auth_controller::unlock_account)) // <-- Nova rota de desbloqueio
                     .route("/refresh", web::post().to(auth_controller::refresh_token)) // <-- Nova rota de refresh token
+                    // Rotas para rotação de tokens
+                    .route("/token/rotate", web::post().to(token_controller::rotate_token))
+                    .route("/token/revoke", web::post().to(token_controller::revoke_token))
                     .service(
                         // Rotas que exigem autenticação JWT
                         web::scope("")
                             .wrap(jwt_auth.clone())
-                            .route("/me", web::get().to(auth_controller::me)),
-                            // Adicionar outras rotas autenticadas aqui se necessário
+                            .route("/me", web::get().to(auth_controller::me))
+                            // Rota para revogar todos os tokens (logout de todos os dispositivos)
+                            .route("/revoke-all/{id}", web::post().to(token_controller::revoke_all_tokens)),
                     ),
             )
             .service(
@@ -70,12 +76,33 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
                             .route(web::delete().wrap(admin_auth.clone()).to(user_controller::delete_user)),
                     )
                     // POST /users/{id}/change-password - Apenas o próprio usuário pode mudar a senha
-                    .route("/{id}/change-password", web::post().to(user_controller::change_password)),
+                    .route("/{id}/change-password", web::post().to(user_controller::change_password))
+                    // Rotas para autenticação de dois fatores (2FA)
+                    .service(
+                        web::scope("/{id}/2fa")
+                            // GET /users/{id}/2fa/setup - Inicia a configuração 2FA
+                            .route("/setup", web::get().to(two_factor_controller::setup_2fa))
+                            // POST /users/{id}/2fa/enable - Ativa 2FA
+                            .route("/enable", web::post().to(two_factor_controller::enable_2fa))
+                            // POST /users/{id}/2fa/disable - Desativa 2FA
+                            .route("/disable", web::post().to(two_factor_controller::disable_2fa))
+                            // POST /users/{id}/2fa/backup-codes - Regenera códigos de backup
+                            .route("/backup-codes", web::post().to(two_factor_controller::regenerate_backup_codes))
+                            // GET /users/{id}/2fa/status - Verifica o status do 2FA
+                            .route("/status", web::get().to(two_factor_controller::get_2fa_status)),
+                    ),
             )
             .service(
                 web::scope("/health")
                     .route("", web::get().to(health_controller::health_check))
                     .route("/version", web::get().to(health_controller::version)),
+            )
+            // Rota de manutenção para limpar tokens expirados (protegida por admin)
+            .service(
+                web::scope("/admin")
+                    .wrap(jwt_auth.clone())
+                    .wrap(admin_auth.clone())
+                    .route("/clean-tokens", web::post().to(token_controller::clean_expired_tokens)),
             ),
     )
     .service(
