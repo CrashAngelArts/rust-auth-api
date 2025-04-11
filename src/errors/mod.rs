@@ -1,6 +1,7 @@
 use actix_web::{http::StatusCode, HttpResponse, ResponseError};
 use serde::Serialize;
 use std::collections::HashMap; // Importar HashMap
+use std::fmt;
 use thiserror::Error;
 use tracing::{error, warn};
 use validator::ValidationErrors;
@@ -40,6 +41,15 @@ pub enum ApiError {
 
     #[error("Conta bloqueada temporariamente: {0}")] // Novo erro para conta bloqueada
     AccountLockedError(String),
+    
+    #[error("Acesso proibido: {0}")]
+    Forbidden(ErrorResponse),
+    
+    #[error("Muitas requisições: {0}")]
+    TooManyRequests(ErrorResponse),
+    
+    #[error("Limite de taxa excedido: {0}")]
+    RateLimited(ErrorResponse),
 }
 
 // Conversão de erro de bloqueio do Actix
@@ -56,34 +66,55 @@ impl From<lettre::transport::smtp::Error> for ApiError {
     }
 }
 
-#[derive(Serialize)]
-struct ErrorResponse {
-    status: String,
-    message: String,
-    code: u16,
+#[derive(Serialize, Clone, Debug)]
+pub struct ErrorResponse {
+    pub status: u16,
+    pub message: String,
+    pub error_code: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    details: Option<String>, // Manter para outros erros
+    pub error_details: Option<String>, // Detalhes adicionais do erro
     #[serde(skip_serializing_if = "Option::is_none")]
-    validation_details: Option<HashMap<String, Vec<String>>>, // Novo campo para erros de validação
+    pub validation_details: Option<HashMap<String, Vec<String>>>, // Campo para erros de validação
+}
+
+// Implementar Display para ErrorResponse
+impl fmt::Display for ErrorResponse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
 }
 
 impl ResponseError for ApiError {
     fn error_response(&self) -> HttpResponse {
         let status_code = self.status_code();
-        // Criar a resposta base
+        
+        // Lidar com os novos tipos de erro que já contém ErrorResponse
+        match self {
+            ApiError::Forbidden(error_response) => {
+                return HttpResponse::build(StatusCode::FORBIDDEN).json(error_response);
+            }
+            ApiError::TooManyRequests(error_response) => {
+                return HttpResponse::build(StatusCode::TOO_MANY_REQUESTS).json(error_response);
+            }
+            ApiError::RateLimited(error_response) => {
+                return HttpResponse::build(StatusCode::TOO_MANY_REQUESTS).json(error_response);
+            }
+            _ => {}
+        }
+        
+        // Criar a resposta base para outros tipos de erro
         let mut error_response = ErrorResponse {
-            status: "error".to_string(),
+            status: status_code.as_u16(),
             message: self.to_string(), // Usa a mensagem definida em #[error(...)]
-            code: status_code.as_u16(),
-            details: None,
+            error_code: format!("ERR_{}", status_code.as_u16()),
+            error_details: None,
             validation_details: None, // Inicializa como None
         };
 
         // Adicionar detalhes específicos para ValidationError
         if let ApiError::ValidationError(details) = self {
             error_response.validation_details = Some(details.clone());
-            // Opcional: Sobrescrever a mensagem genérica se desejar
-            // error_response.message = "Um ou mais campos falharam na validação.".to_string();
+            error_response.error_code = "VALIDATION_ERROR".to_string();
         }
 
         HttpResponse::build(status_code).json(error_response)
@@ -102,6 +133,9 @@ impl ResponseError for ApiError {
             ApiError::BadRequestError(_) => StatusCode::BAD_REQUEST,      // 400
             ApiError::RateLimitExceededError(_) => StatusCode::TOO_MANY_REQUESTS, // 429
             ApiError::AccountLockedError(_) => StatusCode::FORBIDDEN,     // 403 (Usuário identificado, mas proibido de logar)
+            ApiError::Forbidden(_) => StatusCode::FORBIDDEN,              // 403
+            ApiError::TooManyRequests(_) => StatusCode::TOO_MANY_REQUESTS, // 429
+            ApiError::RateLimited(_) => StatusCode::TOO_MANY_REQUESTS,    // 429
         }
     }
 }

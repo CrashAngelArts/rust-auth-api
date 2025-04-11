@@ -51,6 +51,12 @@ pub struct SecurityConfig {
     pub max_login_attempts: u32,
     pub lockout_duration_seconds: u64, // Usar u64 para durações potencialmente longas
     pub unlock_token_duration_minutes: u64, // Duração do token de desbloqueio
+    
+    // Configurações para keystroke dynamics
+    pub keystroke_threshold: Option<u8>,             // Limiar de similaridade para verificação de keystroke
+    pub keystroke_rate_limit_requests: Option<usize>, // Número máximo de tentativas de verificação
+    pub keystroke_rate_limit_duration: Option<u64>,  // Duração da janela de rate limiting em segundos
+    pub keystroke_block_duration: Option<u64>,       // Duração do bloqueio após exceder o limite
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -126,6 +132,20 @@ impl Config {
                 .unwrap_or_else(|_| "30".to_string()) // Padrão: 30 minutos
                 .parse()
                 .unwrap_or(30),
+            
+            // Carregar configurações para keystroke dynamics
+            keystroke_threshold: env::var("SECURITY_KEYSTROKE_THRESHOLD")
+                .ok()
+                .and_then(|v| v.parse().ok()),
+            keystroke_rate_limit_requests: env::var("SECURITY_RATE_LIMIT_REQUESTS")
+                .ok()
+                .and_then(|v| v.parse().ok()),
+            keystroke_rate_limit_duration: env::var("SECURITY_RATE_LIMIT_DURATION")
+                .ok()
+                .and_then(|v| v.parse().ok()),
+            keystroke_block_duration: env::var("SECURITY_BLOCK_DURATION")
+                .ok()
+                .and_then(|v| v.parse().ok()),
         };
 
         let cors = CorsConfig {

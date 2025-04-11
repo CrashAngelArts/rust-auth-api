@@ -13,9 +13,12 @@ use crate::middleware::{
     error::ErrorHandler,
     logger::RequestLogger,
     rate_limiter::RateLimiter,
+    keystroke_rate_limiter::KeystrokeRateLimiter,
 };
+use crate::services::keystroke_security_service::KeystrokeSecurityService;
 use actix_web::{web, HttpResponse};
 use tracing::info;
+use std::time::Duration;
 
 // Configura as rotas da API
 pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
@@ -31,6 +34,19 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
         config.security.rate_limit_requests,
         config.security.rate_limit_duration,
     );
+    
+    // Configurar middleware específico para keystroke dynamics
+    let keystroke_rate_limiter = KeystrokeRateLimiter::new(
+        config.security.keystroke_rate_limit_requests.unwrap_or(5),
+        Duration::from_secs(config.security.keystroke_rate_limit_duration.unwrap_or(60)),
+        Duration::from_secs(config.security.keystroke_block_duration.unwrap_or(300)),
+    );
+    
+    // Configurar serviço de segurança para keystroke dynamics
+    let keystroke_security_service = KeystrokeSecurityService::default();
+    
+    // Registrar o serviço de segurança como um dado compartilhado
+    cfg.app_data(web::Data::new(keystroke_security_service.clone()));
 
     // Configura as rotas
     cfg.service(
@@ -95,6 +111,8 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
                     // Rotas para verificação de ritmo de digitação (keystroke dynamics)
                     .service(
                         web::scope("/{id}/keystroke")
+                            // Aplicar rate limiter específico para keystroke
+                            .wrap(keystroke_rate_limiter.clone())
                             // POST /users/{id}/keystroke/register - Registra um novo padrão de digitação
                             .route("/register", web::post().to(keystroke_controller::register_keystroke_pattern))
                             // POST /users/{id}/keystroke/verify - Verifica um padrão de digitação
@@ -125,5 +143,5 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
         })),
     );
 
-    info!("🚀 Rotas configuradas com sucesso!");
+    info!("🚀 Rotas configuradas com sucesso! Segurança de keystroke ativada 🔒");
 }
