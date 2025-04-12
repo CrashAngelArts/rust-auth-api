@@ -11,7 +11,7 @@ use tracing::info;
 pub struct UserService;
 
 // Colunas base para buscar um usuário completo
-const USER_COLUMNS: &str = "id, email, username, password_hash, first_name, last_name, is_active, is_admin, created_at, updated_at, failed_login_attempts, locked_until, unlock_token, unlock_token_expires_at, totp_secret, totp_enabled, backup_codes, token_family";
+pub const USER_COLUMNS: &str = "id, email, username, password_hash, first_name, last_name, is_active, is_admin, created_at, updated_at, failed_login_attempts, locked_until, unlock_token, unlock_token_expires_at, totp_secret, totp_enabled, backup_codes, token_family, recovery_email";
 
 impl UserService {
     // Cria um novo usuário
@@ -75,8 +75,8 @@ impl UserService {
 
         // Insere o usuário no banco de dados (incluindo valores padrão para novos campos)
         conn.execute(
-            "INSERT INTO users (id, email, username, password_hash, first_name, last_name, is_active, is_admin, created_at, updated_at, failed_login_attempts, locked_until, unlock_token, unlock_token_expires_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+            "INSERT INTO users (id, email, username, password_hash, first_name, last_name, is_active, is_admin, created_at, updated_at, failed_login_attempts, locked_until, unlock_token, unlock_token_expires_at, recovery_email)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
             (
                 &user.id,
                 &user.email,
@@ -92,6 +92,7 @@ impl UserService {
                 &user.locked_until,          // None
                 &user.unlock_token,          // None
                 &user.unlock_token_expires_at, // None
+                &user.recovery_email,        // Email de recuperação
             ),
         )?;
 
@@ -126,6 +127,7 @@ impl UserService {
                     totp_enabled: row.get(15)?,         // Campo para 2FA
                     backup_codes: row.get(16)?,         // Campo para 2FA
                     token_family: row.get(17)?,         // Campo para rotação de tokens
+                    recovery_email: row.get(18)?,       // Campo para email de recuperação 📧
                 })
             },
         ).map_err(|e| match e {
@@ -163,6 +165,7 @@ impl UserService {
                     totp_enabled: row.get(15)?,         // Campo para 2FA
                     backup_codes: row.get(16)?,         // Campo para 2FA
                     token_family: row.get(17)?,         // Campo para rotação de tokens
+                    recovery_email: row.get(18)?,       // Campo para recuperação de senha
                 })
             },
         ).map_err(|e| match e {
@@ -172,39 +175,6 @@ impl UserService {
 
         Ok(user)
     }
-
-    // // Função não utilizada (AuthService usa get_user_by_email_or_username)
-    // pub fn get_user_by_username(pool: &DbPool, username: &str) -> Result<User, ApiError> {
-    //     let conn = pool.get()?;
-    //
-    //     let user = conn.query_row(
-    //          &format!("SELECT {} FROM users WHERE username = ?1", USER_COLUMNS), // Usar constante de colunas
-    //         [username],
-    //         |row| {
-    //              Ok(User {
-    //                 id: row.get(0)?,
-    //                 email: row.get(1)?,
-    //                 username: row.get(2)?,
-    //                 password_hash: row.get(3)?,
-    //                 first_name: row.get(4)?,
-    //                 last_name: row.get(5)?,
-    //                 is_active: row.get(6)?,
-    //                 is_admin: row.get(7)?,
-    //                 created_at: row.get(8)?,
-    //                 updated_at: row.get(9)?,
-    //                 failed_login_attempts: row.get(10)?,
-    //                 locked_until: row.get(11)?,
-    //                 unlock_token: row.get(12)?,
-    //                 unlock_token_expires_at: row.get(13)?,
-    //             })
-    //         },
-    //     ).map_err(|e| match e {
-    //          rusqlite::Error::QueryReturnedNoRows => ApiError::NotFoundError(format!("Usuário com nome de usuário {} não encontrado", username)),
-    //          _ => ApiError::DatabaseError(e.to_string()),
-    //     })?;
-    //
-    //     Ok(user)
-    // }
 
     // Obtém um usuário pelo email ou nome de usuário
     pub fn get_user_by_email_or_username(pool: &DbPool, username_or_email: &str) -> Result<User, ApiError> {
@@ -233,6 +203,7 @@ impl UserService {
                     totp_enabled: row.get(15)?,         // Campo para 2FA
                     backup_codes: row.get(16)?,         // Campo para 2FA
                     token_family: row.get(17)?,         // Campo para rotação de tokens
+                    recovery_email: row.get(18)?,       // Campo para recuperação de senha
                 })
             },
         ).map_err(|e| match e {
@@ -259,7 +230,7 @@ impl UserService {
 
         // Obtém os usuários paginados
         let mut stmt = conn.prepare(
-            "SELECT id, email, username, first_name, last_name, is_active, is_admin, created_at
+            "SELECT id, email, username, first_name, last_name, is_active, is_admin, created_at, recovery_email
              FROM users
              ORDER BY created_at DESC
              LIMIT ?1 OFFSET ?2",
@@ -272,6 +243,7 @@ impl UserService {
                 username: row.get(2)?,
                 first_name: row.get(3)?,
                 last_name: row.get(4)?,
+                recovery_email: row.get(8)?,
                 is_active: row.get(5)?,
                 is_admin: row.get(6)?,
                 created_at: row.get(7)?,

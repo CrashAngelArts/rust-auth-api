@@ -18,6 +18,16 @@ pub struct EmailService {
 }
 
 impl EmailService {
+    // Retorna se o serviço de email está habilitado
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+    
+    // Retorna a URL base
+    pub fn get_base_url(&self) -> &str {
+        &self.base_url
+    }
+    
     pub fn new(
         smtp_server: String,
         smtp_port: u16,

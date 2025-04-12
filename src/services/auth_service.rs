@@ -39,6 +39,7 @@ impl AuthService {
             password: register_dto.password,
             first_name: register_dto.first_name,
             last_name: register_dto.last_name,
+            recovery_email: None, // Email de recuperação opcional 📧
         };
 
         // Cria o usuário
@@ -254,19 +255,25 @@ impl AuthService {
         forgot_dto: ForgotPasswordDto,
         email_service: &EmailService,
     ) -> Result<(), ApiError> {
-        // Obtém o usuário pelo email
-        let user = match UserService::get_user_by_email(pool, &forgot_dto.email) {
+        // Não precisamos da conexão aqui, apenas do pool
+
+        // Busca o usuário
+        let user_result = UserService::get_user_by_email(pool, &forgot_dto.email);
+
+        // Se não encontrar pelo email principal, tentar pelos emails de recuperação
+        let user = match user_result {
             Ok(user) => user,
-            Err(_) => {
-                // Não informamos ao cliente se o email existe ou não por segurança
-                info!("⚠️ Tentativa de recuperação de senha para email não cadastrado: {}", forgot_dto.email);
-                return Ok(());
+            Err(ApiError::NotFoundError(_)) => {
+                // Tentar buscar pelo email de recuperação na nova tabela
+                let user_id = crate::services::recovery_email_service::RecoveryEmailService::get_user_id_by_recovery_email(pool, &forgot_dto.email)?;
+                UserService::get_user_by_id(pool, &user_id)?
             }
+            Err(e) => return Err(e),
         };
 
         // Verifica se o usuário está ativo e não bloqueado (não permitir reset se bloqueado)
         if !user.is_active || user.is_locked() {
-            warn!("⚠️ Tentativa de recuperação de senha para conta inativa ou bloqueada: {}", user.email);
+            warn!(" Tentativa de recuperação de senha para conta inativa ou bloqueada: {}", user.email);
             return Ok(()); // Não informar o status exato
         }
 
@@ -296,9 +303,78 @@ impl AuthService {
         )?;
 
         // Envia o email com o link de recuperação
-        email_service.send_password_reset_email(&user, &token.token).await?;
+        // Determinar para qual email enviar a recuperação
+        let target_email = if user.email == forgot_dto.email {
+            // Se o email fornecido é o principal, enviar para ele
+            &user.email
+        } else {
+            // Se o email fornecido é um dos de recuperação, enviar para ele
+            &forgot_dto.email
+        };
 
-        info!("📧 Email de recuperação de senha enviado para: {}", user.email);
+        // Criar conteúdo do email
+        let reset_link = format!("{}/reset-password?token={}", email_service.get_base_url(), token.token);
+
+        let text_content = format!(
+            "Olá {},\n\nVocê solicitou a redefinição de senha. \n\nClique no link abaixo para redefinir sua senha:\n{}\n\nEste link expira em 1 hora.\n\nSe você não solicitou esta redefinição, ignore este email.\n\nAtenciosamente,\nEquipe de Segurança 🔒",
+            user.full_name(),
+            reset_link
+        );
+        
+        let html_content = format!(
+            r#"<!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Recuperação de Senha</title>
+                <style>
+                    body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; }}
+                    .container {{ padding: 20px; border: 1px solid #ddd; border-radius: 5px; }}
+                    .header {{ background-color: #4a86e8; color: white; padding: 10px; text-align: center; border-radius: 5px 5px 0 0; }}
+                    .content {{ padding: 20px; }}
+                    .button {{ display: inline-block; background-color: #4a86e8; color: white !important; text-decoration: none; padding: 10px 20px; border-radius: 5px; margin: 20px 0; }}
+                    .footer {{ font-size: 12px; color: #777; text-align: center; margin-top: 20px; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header"><h2>Recuperação de Senha 🔑</h2></div>
+                    <div class="content">
+                        <p>Olá, <strong>{}</strong>!</p>
+                        <p>Recebemos uma solicitação para redefinir sua senha. Se você não fez essa solicitação, por favor ignore este email.</p>
+                        <p>Para redefinir sua senha, clique no botão abaixo:</p>
+                        <p style="text-align: center;"><a href="{}" class="button">Redefinir Senha</a></p>
+                        <p>Ou copie e cole o link abaixo no seu navegador:</p>
+                        <p>{}</p>
+                        <p>Este link expirará em 1 hora.</p>
+                        <p>Atenciosamente,<br>Equipe de Suporte 🔒</p>
+                    </div>
+                    <div class="footer"><p>Este é um email automático, por favor não responda.</p></div>
+                </div>
+            </body>
+            </html>
+            "#,
+            user.full_name(),
+            reset_link,
+            reset_link
+        );
+        
+        // Verificar se o serviço de email está habilitado
+        if email_service.is_enabled() {
+            // Enviar o email
+            match email_service.send_email(
+                target_email,
+                "Redefinição de Senha 🔑",
+                &text_content,
+                &html_content,
+            ).await {
+                Ok(_) => info!("📧 Email de recuperação de senha enviado para: {}", target_email),
+                Err(e) => error!("❌ Erro ao enviar email de recuperação de senha: {}", e),
+            }
+        } else {
+            info!("ℹ️ Serviço de email desabilitado. Token de recuperação: {}", token.token);
+        }
+
         Ok(())
     }
 
@@ -415,7 +491,7 @@ impl AuthService {
 
         // 1. Encontra o usuário pelo token de desbloqueio
         let user_result = conn.query_row(
-            "SELECT id, email, username, password_hash, first_name, last_name, is_active, is_admin, created_at, updated_at, failed_login_attempts, locked_until, unlock_token, unlock_token_expires_at
+            "SELECT id, email, username, password_hash, first_name, last_name, is_active, is_admin, created_at, updated_at, failed_login_attempts, locked_until, unlock_token, unlock_token_expires_at, totp_secret, totp_enabled, backup_codes, token_family, recovery_email
              FROM users
              WHERE unlock_token = ?1",
             [&unlock_dto.token],
@@ -439,6 +515,7 @@ impl AuthService {
                     totp_enabled: row.get(15)?,         // Campo para 2FA
                     backup_codes: row.get(16)?,         // Campo para 2FA
                     token_family: row.get(17)?,         // Campo para rotação de tokens
+                    recovery_email: row.get(18)?,       // Campo para email de recuperação
                 })
             },
         );
@@ -714,4 +791,5 @@ impl AuthService {
         }
         Ok(())
     }
+    // Método removido pois agora usamos a tabela recovery_emails
 } // Fecha o bloco impl AuthService

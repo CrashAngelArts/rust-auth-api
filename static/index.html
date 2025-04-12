@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rust Auth API - Sistema de Autenticação Avançado 🚀</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Rust Auth API 🚀</h1>
+            <p>Sistema de autenticação avançado com recursos de segurança de última geração, incluindo análise de ritmo de digitação, verificação por email e gerenciamento de dispositivos! 🔒</p>
+        </div>
+    </header>
+    
+    <section class="features">
+        <div class="container">
+            <h2>Recursos Principais 🛠️</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h3><span>🔒</span> Autenticação Avançada</h3>
+                    <p>Sistema completo com JWT, rotação de tokens, refresh tokens e proteção contra ataques de força bruta.</p>
+                </div>
+                <div class="feature-card">
+                    <h3><span>📱</span> Autenticação de Dois Fatores</h3>
+                    <p>Adicione uma camada extra de segurança com TOTP e códigos de backup para recuperação.</p>
+                </div>
+                <div class="feature-card">
+                    <h3><span>🎹</span> Análise de Ritmo de Digitação</h3>
+                    <p>Verificação biométrica comportamental baseada no padrão único de digitação do usuário.</p>
+                </div>
+                <div class="feature-card">
+                    <h3><span>📧</span> Verificação por Email</h3>
+                    <p>Confirmação de login por email com códigos de 6 dígitos para maior segurança.</p>
+                </div>
+                <div class="feature-card">
+                    <h3><span>📱</span> Gerenciamento de Dispositivos</h3>
+                    <p>Controle completo sobre dispositivos conectados com capacidade de revogar acesso remotamente.</p>
+                </div>
+                <div class="feature-card">
+                    <h3><span>🛡️</span> Proteção Abrangente</h3>
+                    <p>Rate limiting, CORS configurável, logging detalhado e muito mais para proteger sua aplicação.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <section class="device-management">
+        <div class="container">
+            <h2>NOVO: Gerenciamento de Dispositivos 📱</h2>
+            <p>Agora os usuários podem ver e controlar todos os dispositivos conectados à sua conta! Aumente a segurança permitindo que os usuários monitorem e gerenciem o acesso de cada dispositivo.</p>
+            <div class="device-features">
+                <div class="device-feature">
+                    <h3>Listar Dispositivos 📋</h3>
+                    <p>Veja todos os dispositivos conectados à sua conta com detalhes como tipo, localização e última atividade.</p>
+                </div>
+                <div class="device-feature">
+                    <h3>Detalhes do Dispositivo 🔍</h3>
+                    <p>Informações detalhadas sobre cada dispositivo, incluindo navegador, sistema operacional e IP.</p>
+                </div>
+                <div class="device-feature">
+                    <h3>Personalizar Nome 📝</h3>
+                    <p>Dê nomes personalizados aos seus dispositivos para identificá-los facilmente.</p>
+                </div>
+                <div class="device-feature">
+                    <h3>Revogar Acesso 🔒</h3>
+                    <p>Remova o acesso de dispositivos suspeitos ou que você não usa mais com um clique.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <section class="highlight">
+        <div class="container">
+            <h2>Por que escolher nossa API? ✨</h2>
+            <div class="highlight-content">
+                <div class="highlight-item">
+                    <h3>Segurança de Nível Empresarial 🛡️</h3>
+                    <p>Implementamos as melhores práticas de segurança para proteger seus usuários e dados.</p>
+                </div>
+                <div class="highlight-item">
+                    <h3>Desempenho Excepcional 🚀</h3>
+                    <p>Construído com Rust para oferecer velocidade e eficiência incomparáveis.</p>
+                </div>
+                <div class="highlight-item">
+                    <h3>Fácil Integração 🔌</h3>
+                    <p>API RESTful com documentação clara e exemplos para rápida implementação.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <section class="api-routes">
+        <div class="container">
+            <h2>Rotas da API 🛣️</h2>
+            
+            <div class="route-category">
+                <h3>Autenticação 🔑</h3>
+                <ul class="route-list">
+                    <li><span class="method post">POST</span> <code>/api/auth/register</code> - Registro de usuário</li>
+                    <li><span class="method post">POST</span> <code>/api/auth/login</code> - Login</li>
+                    <li><span class="method post">POST</span> <code>/api/auth/forgot-password</code> - Recuperação de senha</li>
+                    <li><span class="method post">POST</span> <code>/api/auth/reset-password</code> - Redefinição de senha</li>
+                    <li><span class="method get">GET</span> <code>/api/auth/me</code> - Recuperação de perfil</li>
+                </ul>
+            </div>
+            
+            <div class="route-category">
+                <h3>Verificação por Email 📧</h3>
+                <ul class="route-list">
+                    <li><span class="method post">POST</span> <code>/api/auth/email-verification/verify</code> - Verificar código</li>
+                    <li><span class="method post">POST</span> <code>/api/auth/email-verification/resend</code> - Reenviar código</li>
+                </ul>
+            </div>
+            
+            <div class="route-category">
+                <h3>Gerenciamento de Dispositivos 📱</h3>
+                <ul class="route-list">
+                    <li><span class="method get">GET</span> <code>/api/auth/devices</code> - Listar todos os dispositivos</li>
+                    <li><span class="method get">GET</span> <code>/api/auth/devices/{id}</code> - Ver detalhes de um dispositivo</li>
+                    <li><span class="method put">PUT</span> <code>/api/auth/devices/{id}</code> - Atualizar informações de um dispositivo</li>
+                    <li><span class="method delete">DELETE</span> <code>/api/auth/devices/{id}</code> - Revogar acesso de um dispositivo</li>
+                </ul>
+            </div>
+            
+            <div class="route-category">
+                <h3>Autenticação de Dois Fatores 📱</h3>
+                <ul class="route-list">
+                    <li><span class="method get">GET</span> <code>/api/users/{id}/2fa/setup</code> - Iniciar configuração 2FA</li>
+                    <li><span class="method post">POST</span> <code>/api/users/{id}/2fa/enable</code> - Ativar 2FA</li>
+                    <li><span class="method post">POST</span> <code>/api/users/{id}/2fa/disable</code> - Desativar 2FA</li>
+                </ul>
+            </div>
+            
+            <div class="route-category">
+                <h3>Análise de Ritmo de Digitação 🎹</h3>
+                <ul class="route-list">
+                    <li><span class="method post">POST</span> <code>/api/users/{id}/keystroke/register</code> - Registrar padrão</li>
+                    <li><span class="method post">POST</span> <code>/api/users/{id}/keystroke/verify</code> - Verificar padrão</li>
+                    <li><span class="method put">PUT</span> <code>/api/users/{id}/keystroke/toggle</code> - Habilitar/desabilitar</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+    
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <p>© 2025 Rust Auth API. Todos os direitos reservados. 🚀</p>
+                <ul class="footer-links">
+                    <li><a href="https://github.com/seu-usuario/rust-auth-api">GitHub</a></li>
+                    <li><a href="https://docs.rust-lang.org/">Rust Docs</a></li>
+                    <li><a href="mailto:contato@exemplo.com">Contato</a></li>
+                </ul>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

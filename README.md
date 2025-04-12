@@ -17,6 +17,8 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação 
 - Códigos de backup para 2FA
 - Verificação por email após login 📧
 - Gerenciamento de dispositivos conectados 📱
+- Múltiplos emails de recuperação verificados 📧
+- Sistema de verificação de emails secundários 🔐
 
 ### Funcionalidades 🛠️
 - Sistema completo de autenticação
@@ -128,10 +130,18 @@ SECURITY_BLOCK_DURATION=300      # Duração do bloqueio em segundos
 
 ### Gerenciamento de Dispositivos (`/api/auth/devices`) 📱
 
-- `GET /` - Listar todos os dispositivos conectados
-- `GET /{id}` - Ver detalhes de um dispositivo específico
+- `GET /` - Listar dispositivos conectados
+- `GET /{id}` - Obter detalhes de um dispositivo
 - `PUT /{id}` - Atualizar informações de um dispositivo
 - `DELETE /{id}` - Revogar acesso de um dispositivo
+
+### Emails de Recuperação (`/api/auth/recovery-emails`) 📧
+
+- `GET /` - Listar emails de recuperação
+- `POST /` - Adicionar novo email de recuperação
+- `POST /verify` - Verificar email de recuperação
+- `DELETE /{id}` - Remover email de recuperação
+- `POST /{id}/resend` - Reenviar email de verificação
 
 ### Usuários (`/api/users`) 👤
 
@@ -281,6 +291,30 @@ SECURITY_BLOCK_DURATION=300      # Duração do bloqueio em segundos
 - Gerenciamento de dispositivos conectados com detecção automática de tipo de dispositivo 📱
 - Rastreamento de sessões ativas com informações detalhadas sobre cada dispositivo 🔍
 - Capacidade de revogar acesso a dispositivos específicos 🔒
+
+## Gerenciamento de Dispositivos 📱
+
+O sistema inclui um gerenciamento completo de dispositivos conectados, permitindo:
+
+- Rastreamento de dispositivos que acessam a conta
+- Detecção automática de sistema operacional, navegador e dispositivo
+- Possibilidade de nomear dispositivos para fácil identificação
+- Revogação remota de acesso a qualquer dispositivo
+- Visualização de data e hora do último acesso
+
+Isso aumenta significativamente a segurança, permitindo que os usuários monitorem e controlem quem tem acesso às suas contas.
+
+## Múltiplos Emails de Recuperação 📧
+
+O sistema agora suporta múltiplos emails de recuperação com verificação obrigatória:
+
+- Adição de vários emails de recuperação por conta
+- Verificação obrigatória por email com token seguro
+- Recuperação de senha usando qualquer email verificado
+- Gerenciamento completo (adicionar, remover, listar)
+- Reenvio de emails de verificação quando necessário
+
+Esta funcionalidade melhora significativamente a segurança e a experiência do usuário, oferecendo múltiplas opções para recuperação de conta em caso de perda de acesso ao email principal. 🔐
 
 ## Logs
 

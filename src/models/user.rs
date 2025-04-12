@@ -12,6 +12,7 @@ pub struct User {
     pub password_hash: String,
     pub first_name: Option<String>,
     pub last_name: Option<String>,
+    pub recovery_email: Option<String>, // Email de recuperação 📧
     pub is_active: bool,
     pub is_admin: bool,
     pub created_at: DateTime<Utc>,
@@ -51,6 +52,7 @@ impl User {
             password_hash,
             first_name,
             last_name,
+            recovery_email: None, // Inicializa sem email de recuperação
             is_active: true, // Contas novas devem estar ativas
             is_admin: false,
             created_at: now,
@@ -97,6 +99,9 @@ pub struct CreateUserDto {
 
     pub first_name: Option<String>,
     pub last_name: Option<String>,
+    
+    #[validate(email(message = "Email de recuperação inválido"))]
+    pub recovery_email: Option<String>, // Email de recuperação opcional 📧
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
@@ -109,6 +114,9 @@ pub struct UpdateUserDto {
 
     pub first_name: Option<String>,
     pub last_name: Option<String>,
+    
+    #[validate(email(message = "Email de recuperação inválido"))]
+    pub recovery_email: Option<String>, // Email de recuperação 📧
 
     pub is_active: Option<bool>,
     // Não permitir atualização direta dos campos de bloqueio via DTO
@@ -133,6 +141,7 @@ pub struct UserResponse {
     pub username: String,
     pub first_name: Option<String>,
     pub last_name: Option<String>,
+    pub recovery_email: Option<String>, // Email de recuperação 📧
     pub is_active: bool,
     pub is_admin: bool,
     pub created_at: DateTime<Utc>,
@@ -147,6 +156,7 @@ impl From<User> for UserResponse {
             username: user.username,
             first_name: user.first_name,
             last_name: user.last_name,
+            recovery_email: user.recovery_email,
             is_active: user.is_active,
             is_admin: user.is_admin,
             created_at: user.created_at,

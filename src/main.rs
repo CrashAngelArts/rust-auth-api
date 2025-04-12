@@ -14,6 +14,7 @@ use actix_session::storage::CookieSessionStore;
 use actix_session::SessionMiddleware;
 use actix_session::config::CookieContentSecurity;
 use actix_web::cookie::Key;
+use actix_files::Files; // Adicionado para servir arquivos estáticos
 use dotenv::dotenv;
 use tracing::{info, error};
 use tracing_actix_web::TracingLogger;
@@ -99,6 +100,8 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(email_service.clone()))
             .app_data(web::JsonConfig::default().limit(4096))
             .app_data(cookie_key.clone())
+            // Servir arquivos estáticos da pasta 'static'
+            .service(Files::new("/static", "static").show_files_listing())
             // Configuração de rotas
             .configure(|cfg| routes::configure_routes(cfg, &server_config))
     })

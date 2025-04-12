@@ -8,6 +8,7 @@ use crate::controllers::{
     keystroke_controller,
     email_verification_controller, // Novo controlador de verificação por email 
     device_controller, // Novo controlador de gerenciamento de dispositivos 📱
+    recovery_email_controller, // Novo controlador de emails de recuperação 📧
 };
 use crate::middleware::{
     auth::{AdminAuth, JwtAuth},
@@ -81,9 +82,18 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
                             .service(
                                 web::scope("/devices")
                                     .route("", web::get().to(device_controller::list_devices))
-                                    .route("/{device_id}", web::get().to(device_controller::get_device))
-                                    .route("/{device_id}", web::put().to(device_controller::update_device))
-                                    .route("/{device_id}", web::delete().to(device_controller::revoke_device)),
+                                    .route("/{id}", web::get().to(device_controller::get_device))
+                                    .route("/{id}", web::put().to(device_controller::update_device))
+                                    .route("/{id}", web::delete().to(device_controller::revoke_device)),
+                            )
+                            // Rotas para gerenciamento de emails de recuperação 📧
+                            .service(
+                                web::scope("/recovery-emails")
+                                    .service(recovery_email_controller::list_recovery_emails)
+                                    .service(recovery_email_controller::add_recovery_email)
+                                    .service(recovery_email_controller::verify_recovery_email)
+                                    .service(recovery_email_controller::remove_recovery_email)
+                                    .service(recovery_email_controller::resend_verification_email),
                             ),
                     )
                     // Rotas para verificação por email após login 📧
@@ -159,9 +169,16 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
             ),
     )
     .service(
-        // Rota raiz para uma mensagem simples
+        // Rota raiz para servir o arquivo index.html da pasta static
         web::resource("/").route(web::get().to(|| async {
-            HttpResponse::Ok().body("API REST em Rust - Acesse /api para utilizar a API")
+            // Ler o arquivo index.html da pasta static
+            match std::fs::read_to_string("static/index.html") {
+                Ok(content) => HttpResponse::Ok()
+                    .content_type("text/html; charset=utf-8")
+                    .body(content),
+                Err(_) => HttpResponse::InternalServerError()
+                    .body("Erro ao carregar a página inicial 😢")
+            }
         })),
     );
 

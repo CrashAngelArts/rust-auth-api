@@ -4,5 +4,6 @@ pub mod response;
 pub mod two_factor;
 pub mod token;
 pub mod keystroke_dynamics;
+pub mod recovery_email;
 pub mod email_verification;
 pub mod device;
