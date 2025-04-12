@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rust Auth API - Sistema de Autenticação Avançado 🚀</title>
+    <style>
+        :root {
+            --primary: #ff6b35;
+            --secondary: #2a9d8f;
+            --dark: #264653;
+            --light: #f8f9fa;
+            --accent: #e9c46a;
+            --success: #2a9d8f;
+            --danger: #e76f51;
+            --warning: #f4a261;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--dark);
+            background-color: var(--light);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        header {
+            background-color: var(--dark);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+        }
+        
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        header p {
+            font-size: 1.2rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .features {
+            padding: 3rem 0;
+        }
+        
+        .features h2 {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: var(--primary);
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+        
+        .feature-card {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            transition: transform 0.3s ease;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .feature-card h3 {
+            color: var(--secondary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .feature-card h3 span {
+            margin-right: 10px;
+            font-size: 1.5rem;
+        }
+        
+        .feature-card p {
+            color: #666;
+        }
+        
+        .highlight {
+            background-color: var(--accent);
+            color: var(--dark);
+            padding: 3rem 0;
+            text-align: center;
+        }
+        
+        .highlight h2 {
+            margin-bottom: 1.5rem;
+        }
+        
+        .highlight-content {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 2rem;
+        }
+        
+        .highlight-item {
+            background-color: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            flex: 1;
+            min-width: 250px;
+            max-width: 350px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .highlight-item h3 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+        
+        .api-routes {
+            padding: 3rem 0;
+        }
+        
+        .api-routes h2 {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: var(--primary);
+        }
+        
+        .route-category {
+            margin-bottom: 2rem;
+        }
+        
+        .route-category h3 {
+            color: var(--secondary);
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 0.5rem;
+        }
+        
+        .route-list {
+            list-style: none;
+        }
+        
+        .route-list li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .route-list code {
+            background-color: #f0f0f0;
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        
+        .method {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            color: white;
+            font-weight: bold;
+            margin-right: 0.5rem;
+            font-size: 0.8rem;
+        }
+        
+        .get {
+            background-color: var(--secondary);
+        }
+        
+        .post {
+            background-color: var(--primary);
+        }
+        
+        .put {
+            background-color: var(--warning);
+        }
+        
+        .delete {
+            background-color: var(--danger);
+        }
+        
+        .device-management {
+            background-color: var(--secondary);
+            color: white;
+            padding: 3rem 0;
+            text-align: center;
+        }
+        
+        .device-management h2 {
+            margin-bottom: 1.5rem;
+        }
+        
+        .device-management p {
+            max-width: 800px;
+            margin: 0 auto 2rem;
+        }
+        
+        .device-features {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+        }
+        
+        .device-feature {
+            background-color: white;
+            color: var(--dark);
+            border-radius: 10px;
+            padding: 1.5rem;
+            flex: 1;
+            min-width: 200px;
+            max-width: 250px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .device-feature h3 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+        
+        footer {
+            background-color: var(--dark);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+        }
+        
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        
+        .footer-content p {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        .footer-links {
+            list-style: none;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .footer-links a {
+            color: white;
+            text-decoration: none;
+        }
+        
+        .footer-links a:hover {
+            color: var(--accent);
+        }
+        
+        @media (max-width: 768px) {
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .highlight-content {
+                flex-direction: column;
+            }
+            
+            .footer-content {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .footer-links {
+                justify-content: center;
+                margin-top: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Rust Auth API 🚀</h1>
+            <p>Sistema de autenticação avançado com recursos de segurança de última geração, incluindo análise de ritmo de digitação, verificação por email e gerenciamento de dispositivos! 🔒</p>
+        </div>
+    </header>
+    
+    <section class="features">
+        <div class="container">
+            <h2>Recursos Principais 🛠️</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h3><span>🔒</span> Autenticação Avançada</h3>
+                    <p>Sistema completo com JWT, rotação de tokens, refresh tokens e proteção contra ataques de força bruta.</p>
+                </div>
+                <div class="feature-card">
+                    <h3><span>📱</span> Autenticação de Dois Fatores</h3>
+                    <p>Adicione uma camada extra de segurança com TOTP e códigos de backup para recuperação.</p>
+                </div>
+                <div class="feature-card">
+                    <h3><span>🎹</span> Análise de Ritmo de Digitação</h3>
+                    <p>Verificação biométrica comportamental baseada no padrão único de digitação do usuário.</p>
+                </div>
+                <div class="feature-card">
+                    <h3><span>📧</span> Verificação por Email</h3>
+                    <p>Confirmação de login por email com códigos de 6 dígitos para maior segurança.</p>
+                </div>
+                <div class="feature-card">
+                    <h3><span>📱</span> Gerenciamento de Dispositivos</h3>
+                    <p>Controle completo sobre dispositivos conectados com capacidade de revogar acesso remotamente.</p>
+                </div>
+                <div class="feature-card">
+                    <h3><span>🛡️</span> Proteção Abrangente</h3>
+                    <p>Rate limiting, CORS configurável, logging detalhado e muito mais para proteger sua aplicação.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <section class="device-management">
+        <div class="container">
+            <h2>NOVO: Gerenciamento de Dispositivos 📱</h2>
+            <p>Agora os usuários podem ver e controlar todos os dispositivos conectados à sua conta! Aumente a segurança permitindo que os usuários monitorem e gerenciem o acesso de cada dispositivo.</p>
+            <div class="device-features">
+                <div class="device-feature">
+                    <h3>Listar Dispositivos 📋</h3>
+                    <p>Veja todos os dispositivos conectados à sua conta com detalhes como tipo, localização e última atividade.</p>
+                </div>
+                <div class="device-feature">
+                    <h3>Detalhes do Dispositivo 🔍</h3>
+                    <p>Informações detalhadas sobre cada dispositivo, incluindo navegador, sistema operacional e IP.</p>
+                </div>
+                <div class="device-feature">
+                    <h3>Personalizar Nome 📝</h3>
+                    <p>Dê nomes personalizados aos seus dispositivos para identificá-los facilmente.</p>
+                </div>
+                <div class="device-feature">
+                    <h3>Revogar Acesso 🔒</h3>
+                    <p>Remova o acesso de dispositivos suspeitos ou que você não usa mais com um clique.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <section class="highlight">
+        <div class="container">
+            <h2>Por que escolher nossa API? ✨</h2>
+            <div class="highlight-content">
+                <div class="highlight-item">
+                    <h3>Segurança de Nível Empresarial 🛡️</h3>
+                    <p>Implementamos as melhores práticas de segurança para proteger seus usuários e dados.</p>
+                </div>
+                <div class="highlight-item">
+                    <h3>Desempenho Excepcional 🚀</h3>
+                    <p>Construído com Rust para oferecer velocidade e eficiência incomparáveis.</p>
+                </div>
+                <div class="highlight-item">
+                    <h3>Fácil Integração 🔌</h3>
+                    <p>API RESTful com documentação clara e exemplos para rápida implementação.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <section class="api-routes">
+        <div class="container">
+            <h2>Rotas da API 🛣️</h2>
+            
+            <div class="route-category">
+                <h3>Autenticação 🔑</h3>
+                <ul class="route-list">
+                    <li><span class="method post">POST</span> <code>/api/auth/register</code> - Registro de usuário</li>
+                    <li><span class="method post">POST</span> <code>/api/auth/login</code> - Login</li>
+                    <li><span class="method post">POST</span> <code>/api/auth/forgot-password</code> - Recuperação de senha</li>
+                    <li><span class="method post">POST</span> <code>/api/auth/reset-password</code> - Redefinição de senha</li>
+                    <li><span class="method get">GET</span> <code>/api/auth/me</code> - Recuperação de perfil</li>
+                </ul>
+            </div>
+            
+            <div class="route-category">
+                <h3>Verificação por Email 📧</h3>
+                <ul class="route-list">
+                    <li><span class="method post">POST</span> <code>/api/auth/email-verification/verify</code> - Verificar código</li>
+                    <li><span class="method post">POST</span> <code>/api/auth/email-verification/resend</code> - Reenviar código</li>
+                </ul>
+            </div>
+            
+            <div class="route-category">
+                <h3>Gerenciamento de Dispositivos 📱</h3>
+                <ul class="route-list">
+                    <li><span class="method get">GET</span> <code>/api/auth/devices</code> - Listar todos os dispositivos</li>
+                    <li><span class="method get">GET</span> <code>/api/auth/devices/{id}</code> - Ver detalhes de um dispositivo</li>
+                    <li><span class="method put">PUT</span> <code>/api/auth/devices/{id}</code> - Atualizar informações de um dispositivo</li>
+                    <li><span class="method delete">DELETE</span> <code>/api/auth/devices/{id}</code> - Revogar acesso de um dispositivo</li>
+                </ul>
+            </div>
+            
+            <div class="route-category">
+                <h3>Autenticação de Dois Fatores 📱</h3>
+                <ul class="route-list">
+                    <li><span class="method get">GET</span> <code>/api/users/{id}/2fa/setup</code> - Iniciar configuração 2FA</li>
+                    <li><span class="method post">POST</span> <code>/api/users/{id}/2fa/enable</code> - Ativar 2FA</li>
+                    <li><span class="method post">POST</span> <code>/api/users/{id}/2fa/disable</code> - Desativar 2FA</li>
+                </ul>
+            </div>
+            
+            <div class="route-category">
+                <h3>Análise de Ritmo de Digitação 🎹</h3>
+                <ul class="route-list">
+                    <li><span class="method post">POST</span> <code>/api/users/{id}/keystroke/register</code> - Registrar padrão</li>
+                    <li><span class="method post">POST</span> <code>/api/users/{id}/keystroke/verify</code> - Verificar padrão</li>
+                    <li><span class="method put">PUT</span> <code>/api/users/{id}/keystroke/toggle</code> - Habilitar/desabilitar</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+    
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <p>© 2025 Rust Auth API. Todos os direitos reservados. 🚀</p>
+                <ul class="footer-links">
+                    <li><a href="https://github.com/seu-usuario/rust-auth-api">GitHub</a></li>
+                    <li><a href="https://docs.rust-lang.org/">Rust Docs</a></li>
+                    <li><a href="mailto:contato@exemplo.com">Contato</a></li>
+                </ul>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

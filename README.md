@@ -16,6 +16,7 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação 
 - Análise de ritmo de digitação (keystroke dynamics)
 - Códigos de backup para 2FA
 - Verificação por email após login 📧
+- Gerenciamento de dispositivos conectados 📱
 
 ### Funcionalidades 🛠️
 - Sistema completo de autenticação
@@ -31,6 +32,7 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação 
 - Rotação de família de tokens
 - Revogação de tokens em todos os dispositivos
 - Verificação por email após login com códigos de 6 dígitos 📨
+- Gerenciamento completo de dispositivos conectados (listar, visualizar, atualizar, revogar) 📱
 
 ## Requisitos
 
@@ -123,6 +125,13 @@ SECURITY_BLOCK_DURATION=300      # Duração do bloqueio em segundos
 
 - `POST /verify` - Verificar código enviado por email após login
 - `POST /resend` - Reenviar código de verificação por email
+
+### Gerenciamento de Dispositivos (`/api/auth/devices`) 📱
+
+- `GET /` - Listar todos os dispositivos conectados
+- `GET /{id}` - Ver detalhes de um dispositivo específico
+- `PUT /{id}` - Atualizar informações de um dispositivo
+- `DELETE /{id}` - Revogar acesso de um dispositivo
 
 ### Usuários (`/api/users`) 👤
 
@@ -230,8 +239,25 @@ SECURITY_BLOCK_DURATION=300      # Duração do bloqueio em segundos
 - user_id: String
 - ip_address: Option<String>
 - user_agent: Option<String>
+- device_name: Option<String>
+- device_type: Option<String>
+- location: Option<String>
+- last_active_at: Option<DateTime>
+- is_current: bool
 - created_at: DateTime
 - expires_at: DateTime
+
+### Device
+- id: String
+- user_id: String
+- device_name: String
+- device_type: String
+- ip_address: Option<String>
+- user_agent: Option<String>
+- location: Option<String>
+- last_active_at: DateTime
+- is_current: bool
+- created_at: DateTime
 
 ## Segurança 🛡️
 
@@ -252,6 +278,9 @@ SECURITY_BLOCK_DURATION=300      # Duração do bloqueio em segundos
 - Monitoramento de atividades suspeitas em tentativas de verificação
 - Revogação de tokens em todos os dispositivos
 - Verificação por email após login com códigos de 6 dígitos e expiração configurável 📧
+- Gerenciamento de dispositivos conectados com detecção automática de tipo de dispositivo 📱
+- Rastreamento de sessões ativas com informações detalhadas sobre cada dispositivo 🔍
+- Capacidade de revogar acesso a dispositivos específicos 🔒
 
 ## Logs
 
@@ -296,6 +325,7 @@ Para reportar bugs ou solicitar novas funcionalidades, abra uma issue no reposit
 - [x] Adicionar detecção de anomalias em padrões de digitação
 - [x] Implementar proteção contra ataques de força bruta em keystroke
 - [x] Implementar verificação por email após login
+- [x] Implementar gerenciamento de dispositivos conectados
 - [ ] Implementar autenticação via OAuth
 - [ ] Adicionar suporte a múltiplos tenants
 - [ ] Implementar sistema de permissões granular
