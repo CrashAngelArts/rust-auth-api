@@ -278,6 +278,28 @@ Implements user management business logic.
 - `verify_password()`: Verifies a password against its hash
 - `list_users()`: Lists all users
 
+#### keystroke_service.rs
+Implementa a lógica de negócios para análise de ritmo de digitação.
+
+**Funções:**
+- `register_pattern()`: Registra um novo padrão de digitação
+- `verify_keystroke_pattern()`: Verifica um padrão durante o login
+- `toggle_keystroke_verification()`: Habilita/desabilita verificação
+- `get_keystroke_status()`: Obtém o status atual da verificação
+
+#### keystroke_security_service.rs
+Implementa monitoramento de segurança e detecção de anomalias para keystroke dynamics.
+
+**Struct:**
+- `KeystrokeSecurityService`: Serviço para monitorar tentativas de verificação de keystroke
+
+**Métodos:**
+- `record_verification_attempt()`: Registra e analisa tentativas de verificação
+- `check_for_suspicious_patterns()`: Detecta anomalias em padrões de digitação
+- `check_consecutive_failures()`: Monitora ataques de força bruta
+- `calculate_anomaly_score()`: Calcula pontuações de anomalia para padrões de digitação
+- `is_user_suspicious()`: Verifica se um usuário está sob suspeita
+
 ### Middleware Module (`src/middleware/`)
 
 #### auth.rs
@@ -318,6 +340,16 @@ Implements rate limiting to prevent abuse.
 **Methods:**
 - `RateLimiter::new()`: Creates a new rate limiter with specified limits
 
+#### keystroke_rate_limiter.rs
+Implements specialized rate limiting for keystroke dynamics verification.
+
+**Struct:**
+- `KeystrokeRateLimiter`: Middleware for rate limiting keystroke verification attempts
+
+**Methods:**
+- `KeystrokeRateLimiter::new()`: Creates a new keystroke rate limiter with specified limits
+- `clean_keystroke_rate_limit_entries()`: Cleans expired rate limit entries
+
 ### Routes Module (`src/routes/`)
 
 #### mod.rs
@@ -356,7 +388,7 @@ Configures API routes and middleware.
 
 ### Keystroke Dynamics Endpoints 🎹
 - `POST /api/users/{id}/keystroke/register`: Registrar padrão de digitação
-- `POST /api/users/{id}/keystroke/verify`: Verificar padrão de digitação
+- `POST /api/users/{id}/keystroke/verify`: Verificar padrão de digitação (com proteção contra ataques de força bruta)
 - `PUT /api/users/{id}/keystroke/toggle`: Habilitar/desabilitar verificação
 - `GET /api/users/{id}/keystroke/status`: Verificar status da verificação
 
@@ -381,3 +413,7 @@ Configures API routes and middleware.
 10. **Token Rotation**: Rotação de tokens JWT com invalidação baseada em família
 11. **Token Blacklist**: Lista negra de tokens para revogação imediata
 12. **Keystroke Dynamics**: Análise de ritmo de digitação para verificação biométrica comportamental
+13. **Rate Limiting para Keystroke**: Limitação de taxa específica para tentativas de verificação de keystroke
+14. **Detecção de Anomalias**: Identificação de padrões anômalos em tentativas de verificação
+15. **Proteção contra Força Bruta**: Mecanismos avançados para prevenir ataques de força bruta
+16. **Monitoramento de Segurança**: Monitoramento contínuo de atividades suspeitas

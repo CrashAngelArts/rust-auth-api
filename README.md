@@ -92,7 +92,13 @@ SECURITY_RATE_LIMIT_DURATION=1h
 SECURITY_2FA_ENABLED=true
 SECURITY_2FA_ISSUER="Sua Empresa"
 SECURITY_KEYSTROKE_ENABLED=true
-SECURITY_KEYSTROKE_THRESHOLD=80
+SECURITY_KEYSTROKE_THRESHOLD=70
+
+# Segurança de Keystroke Dynamics
+SECURITY_KEYSTROKE_THRESHOLD=70  # Limiar de similaridade (0-100)
+SECURITY_RATE_LIMIT_REQUESTS=5   # Máximo de tentativas de verificação
+SECURITY_RATE_LIMIT_DURATION=60  # Duração da janela em segundos
+SECURITY_BLOCK_DURATION=300      # Duração do bloqueio em segundos
 ```
 
 ## Rotas da API
@@ -129,7 +135,7 @@ SECURITY_KEYSTROKE_THRESHOLD=80
 ### Análise de Ritmo de Digitação (`/api/users/{id}/keystroke`) 🎹
 
 - `POST /register` - Registrar padrão de digitação
-- `POST /verify` - Verificar padrão de digitação
+- `POST /verify` - Verificar padrão de digitação (com proteção contra ataques de força bruta)
 - `PUT /toggle` - Habilitar/desabilitar verificação
 - `GET /status` - Verificar status da verificação
 
@@ -146,7 +152,7 @@ SECURITY_KEYSTROKE_THRESHOLD=80
 
 - `GET /` - Mensagem de boas-vindas
 
-## Middleware 🔄
+## Middleware 🔁
 
 - JWT Authentication
 - Admin Authorization
@@ -157,6 +163,8 @@ SECURITY_KEYSTROKE_THRESHOLD=80
 - Token Blacklist
 - Two-Factor Verification
 - Keystroke Dynamics Verification
+- Keystroke Rate Limiter
+- Keystroke Security Monitoring
 
 ## Modelos de Dados 📊
 
@@ -228,6 +236,10 @@ SECURITY_KEYSTROKE_THRESHOLD=80
 - Códigos de backup para recuperação de 2FA
 - Lista negra de tokens para revogação imediata
 - Análise de ritmo de digitação para verificação biométrica comportamental
+- Rate limiting específico para keystroke dynamics
+- Detecção de anomalias em padrões de digitação
+- Proteção contra ataques de força bruta em keystroke dynamics
+- Monitoramento de atividades suspeitas em tentativas de verificação
 - Revogação de tokens em todos os dispositivos
 
 ## Logs
@@ -269,6 +281,9 @@ Para reportar bugs ou solicitar novas funcionalidades, abra uma issue no reposit
 - [x] Adicionar rotação de tokens JWT
 - [x] Implementar lista negra de tokens
 - [x] Adicionar análise de ritmo de digitação
+- [x] Implementar rate limiting para keystroke dynamics
+- [x] Adicionar detecção de anomalias em padrões de digitação
+- [x] Implementar proteção contra ataques de força bruta em keystroke
 - [ ] Implementar autenticação via OAuth
 - [ ] Adicionar suporte a múltiplos tenants
 - [ ] Implementar sistema de permissões granular
