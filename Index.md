@@ -415,6 +415,7 @@ Configures API routes and middleware.
 ### Email Verification Endpoints 📧
 - `POST /api/auth/email-verification/verify`: Verificar código enviado por email após login
 - `POST /api/auth/email-verification/resend`: Reenviar código de verificação por email
+- `POST /api/admin/clean-verification-codes`: Limpar códigos de verificação expirados (admin)
 
 ### User Endpoints 👤
 - `GET /api/users`: Listar todos os usuários (somente admin)
@@ -462,4 +463,5 @@ Configures API routes and middleware.
 14. **Detecção de Anomalias**: Identificação de padrões anômalos em tentativas de verificação
 15. **Proteção contra Força Bruta**: Mecanismos avançados para prevenir ataques de força bruta
 16. **Monitoramento de Segurança**: Monitoramento contínuo de atividades suspeitas
+17. **Verificação por Email após Login**: Verificação adicional de segurança com código enviado por email após login 📧
 17. **Verificação por Email após Login**: Verificação adicional de segurança com código enviado por email após login 📧

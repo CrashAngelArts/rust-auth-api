@@ -15,6 +15,7 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação 
 - Lista negra de tokens
 - Análise de ritmo de digitação (keystroke dynamics)
 - Códigos de backup para 2FA
+- Verificação por email após login 📧
 
 ### Funcionalidades 🛠️
 - Sistema completo de autenticação
@@ -29,6 +30,7 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação 
 - Verificação biométrica comportamental
 - Rotação de família de tokens
 - Revogação de tokens em todos os dispositivos
+- Verificação por email após login com códigos de 6 dígitos 📨
 
 ## Requisitos
 
@@ -84,6 +86,7 @@ EMAIL_FROM=seu_email@gmail.com
 EMAIL_FROM_NAME="Nome do Sistema"
 EMAIL_BASE_URL=http://localhost:8080
 EMAIL_ENABLED=true
+EMAIL_VERIFICATION_ENABLED=true
 
 # Segurança
 SECURITY_SALT_ROUNDS=10
@@ -115,6 +118,11 @@ SECURITY_BLOCK_DURATION=300      # Duração do bloqueio em segundos
 - `POST /token/rotate` - Rotacionar token JWT
 - `POST /token/revoke` - Revogar token JWT
 - `POST /revoke-all/{id}` - Revogar todos os tokens (logout de todos os dispositivos)
+
+### Verificação por Email (`/api/auth/email-verification`) 📧
+
+- `POST /verify` - Verificar código enviado por email após login
+- `POST /resend` - Reenviar código de verificação por email
 
 ### Usuários (`/api/users`) 👤
 
@@ -165,6 +173,7 @@ SECURITY_BLOCK_DURATION=300      # Duração do bloqueio em segundos
 - Keystroke Dynamics Verification
 - Keystroke Rate Limiter
 - Keystroke Security Monitoring
+- Email Verification Check
 
 ## Modelos de Dados 📊
 
@@ -191,6 +200,7 @@ SECURITY_BLOCK_DURATION=300      # Duração do bloqueio em segundos
 - token_type: String
 - expires_in: i64
 - requires_2fa: bool
+- requires_email_verification: bool
 - user: User
 
 ### TokenClaims
@@ -241,6 +251,7 @@ SECURITY_BLOCK_DURATION=300      # Duração do bloqueio em segundos
 - Proteção contra ataques de força bruta em keystroke dynamics
 - Monitoramento de atividades suspeitas em tentativas de verificação
 - Revogação de tokens em todos os dispositivos
+- Verificação por email após login com códigos de 6 dígitos e expiração configurável 📧
 
 ## Logs
 
@@ -284,6 +295,7 @@ Para reportar bugs ou solicitar novas funcionalidades, abra uma issue no reposit
 - [x] Implementar rate limiting para keystroke dynamics
 - [x] Adicionar detecção de anomalias em padrões de digitação
 - [x] Implementar proteção contra ataques de força bruta em keystroke
+- [x] Implementar verificação por email após login
 - [ ] Implementar autenticação via OAuth
 - [ ] Adicionar suporte a múltiplos tenants
 - [ ] Implementar sistema de permissões granular
