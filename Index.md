@@ -1,4 +1,4 @@
-# Rust Auth API - Project Index 🚀
+# Rust Auth API - Project Index 
 
 ## Project Structure Overview
 
@@ -90,7 +90,7 @@ rust-auth-api/
 O ponto de entrada da aplicação que inicializa e inicia o servidor web.
 
 **Funções Principais:**
-- `main()`: Inicializa a aplicação, carrega configuração, configura conexão com banco de dados e inicia o servidor web.
+- `main()`: Inicializa a aplicação, carrega configuração, configura conexão com banco de dados, inicializa serviços (como email) e o cache de validação de token (Moka), e inicia o servidor web.
 
 ### lib.rs
 Exporta todos os módulos para uso em outras partes da aplicação.
@@ -116,7 +116,7 @@ Gerencia a configuração da aplicação carregada de variáveis de ambiente.
 - `Config::from_env()`: Carrega configuração de variáveis de ambiente
 - `load_config()`: Função auxiliar para carregar a configuração
 
-### Controllers Module (`src/controllers/`) 🎮
+### Controllers Module (`src/controllers/`) 
 
 #### auth_controller.rs
 Lida com requisições HTTP relacionadas à autenticação.
@@ -131,7 +131,7 @@ Lida com requisições HTTP relacionadas à autenticação.
 - `me()`: Retorna as informações do usuário autenticado atual
 
 #### device_controller.rs
-Lida com requisições HTTP relacionadas ao gerenciamento de dispositivos conectados 📱
+Lida com requisições HTTP relacionadas ao gerenciamento de dispositivos conectados 
 
 **Functions:**
 - `list_devices()`: Lista todos os dispositivos conectados à conta do usuário
@@ -144,9 +144,9 @@ Lida com requisições HTTP relacionadas ao gerenciamento de dispositivos conect
 Lida com requisições HTTP relacionadas à verificação por email após login.
 
 **Functions:**
-- `verify_email_code()`: Verifica um código enviado por email após login 📧
-- `resend_verification_code()`: Reenvia o código de verificação por email 📨
-- `clean_expired_codes()`: Limpa códigos de verificação expirados 🧹
+- `verify_email_code()`: Verifica um código enviado por email após login 
+- `resend_verification_code()`: Reenvia o código de verificação por email 
+- `clean_expired_codes()`: Limpa códigos de verificação expirados 
 
 #### recovery_email_controller.rs
 Gerencia os emails de recuperação secundários para contas de usuário.
@@ -204,7 +204,7 @@ Lida com endpoints de verificação de saúde.
 - `version()`: Retorna as informações de versão da API
 
 #### oauth_controller.rs
-Lida com requisições HTTP relacionadas à autenticação OAuth com provedores sociais 🌐
+Lida com requisições HTTP relacionadas à autenticação OAuth com provedores sociais 
 
 **Functions:**
 - `oauth_login()`: Inicia o fluxo de login OAuth redirecionando para o provedor
@@ -213,7 +213,7 @@ Lida com requisições HTTP relacionadas à autenticação OAuth com provedores 
 - `remove_oauth_connection()`: Remove uma conexão OAuth específica
 - `clean_expired_tokens()`: Limpa tokens expirados da lista negra
 
-### Models Module (`src/models/`) 📋
+### Models Module (`src/models/`) 
 
 #### device.rs
 Define estruturas de dados para o gerenciamento de dispositivos conectados.
@@ -327,7 +327,7 @@ Define estruturas de dados para autenticação OAuth.
 - `OAuthLoginRequest`: Requisição para iniciar login OAuth
 - `OAuthCallbackRequest`: Dados recebidos no callback OAuth
 
-### Services Module (`src/services/`)
+### Services Module (`src/services/`) 
 
 #### device_service.rs
 Implementa a lógica de negócios para gerenciamento de dispositivos conectados.
@@ -346,7 +346,7 @@ Implementa a lógica de negócios para gerenciamento de dispositivos conectados.
 Implementa a lógica de negócios para verificação por email após login.
 
 **Functions:**
-- `generate_and_send_code()`: Gera um novo código e envia por email 📧
+- `generate_and_send_code()`: Gera um novo código e envia por email 
 - `verify_code()`: Verifica um código enviado pelo usuário
 - `has_pending_code()`: Verifica se o usuário tem um código pendente
 - `clean_expired_codes()`: Limpa códigos expirados
@@ -373,7 +373,7 @@ Implementa a lógica de negócios para autenticação.
 - `reset_password()`: Redefine a senha de um usuário
 - `refresh_token()`: Atualiza um token de acesso
 - `unlock_account()`: Desbloqueia uma conta bloqueada
-- `validate_token()`: Valida um token JWT
+- `validate_token()`: Valida um token JWT, verificando primeiro o cache (Moka) antes de decodificar e, opcionalmente, verificando a blacklist.
 - `generate_jwt()`: Gera um token JWT
 - `create_session()`: Cria uma nova sessão de usuário
 - `log_auth_event()`: Registra eventos de autenticação
@@ -478,7 +478,7 @@ Implementa a lógica de negócios para autenticação OAuth com provedores socia
 - `log_auth_event()`: Registra eventos de autenticação
 - `parse_expiration()`: Analisa o tempo de expiração do token
 
-### Middleware Module (`src/middleware/`)
+### Middleware Module (`src/middleware/`) 
 
 #### email_verification.rs
 Implementa middleware para verificação por email após login.
@@ -544,7 +544,7 @@ Implementa configurações de segurança para a API.
 - `configure_security()`: Configura headers de segurança e proteção CSRF
 - `get_secure_headers()`: Cria headers de segurança padrão
 
-### Routes Module (`src/routes/`)
+### Routes Module (`src/routes/`) 
 
 #### mod.rs
 Configura rotas da API e middleware.
@@ -552,9 +552,9 @@ Configura rotas da API e middleware.
 **Functions:**
 - `configure_routes()`: Configura todas as rotas da API com seus respectivos middlewares
 
-## API Endpoints 🛣️
+## API Endpoints 
 
-### Authentication Endpoints 🔑
+### Authentication Endpoints 
 - `POST /api/auth/register`: Registrar novo usuário
 - `POST /api/auth/login`: Autenticar usuário
 - `POST /api/auth/forgot-password`: Solicitar recuperação de senha
@@ -563,7 +563,7 @@ Configura rotas da API e middleware.
 - `POST /api/auth/unlock`: Desbloquear conta
 - `GET /api/auth/me`: Obter perfil do usuário atual
 
-### OAuth Endpoints 🌐
+### OAuth Endpoints 
 - `GET /api/auth/oauth/login?provider=google`: Iniciar login OAuth
 - `GET /api/auth/oauth/callback`: Callback para processamento OAuth
 - `GET /api/auth/oauth/connections/{user_id}`: Listar conexões OAuth
@@ -572,53 +572,53 @@ Configura rotas da API e middleware.
 - `POST /api/auth/token/revoke`: Revogar token JWT
 - `POST /api/auth/revoke-all/{id}`: Revogar todos os tokens (logout de todos os dispositivos)
 
-### Email Verification Endpoints 📧
+### Email Verification Endpoints 
 - `POST /api/auth/email-verification/verify`: Verificar código enviado por email após login
 - `POST /api/auth/email-verification/resend`: Reenviar código de verificação por email
 
-### Device Management Endpoints 📱
+### Device Management Endpoints 
 - `GET /api/auth/devices`: Listar todos os dispositivos conectados
 - `GET /api/auth/devices/{id}`: Obter detalhes de um dispositivo
 - `PUT /api/auth/devices/{id}`: Atualizar informações de um dispositivo
 - `DELETE /api/auth/devices/{id}`: Revogar acesso de um dispositivo
 
-### Recovery Email Endpoints 📧
+### Recovery Email Endpoints 
 - `GET /api/auth/recovery-emails`: Listar emails de recuperação
 - `POST /api/auth/recovery-emails`: Adicionar novo email de recuperação
 - `POST /api/auth/recovery-emails/verify`: Verificar email de recuperação
 - `DELETE /api/auth/recovery-emails/{id}`: Remover email de recuperação
 - `POST /api/auth/recovery-emails/{id}/resend`: Reenviar email de verificação
 
-### User Endpoints 👤
+### User Endpoints 
 - `GET /api/users`: Listar todos os usuários (somente admin)
 - `GET /api/users/{id}`: Obter usuário por ID
 - `PUT /api/users/{id}`: Atualizar usuário
 - `DELETE /api/users/{id}`: Excluir usuário (somente admin)
 - `POST /api/users/{id}/change-password`: Alterar senha do usuário
 
-### Two-Factor Authentication Endpoints 📱
+### Two-Factor Authentication Endpoints 
 - `GET /api/users/{id}/2fa/setup`: Iniciar configuração 2FA
 - `POST /api/users/{id}/2fa/enable`: Ativar 2FA
 - `POST /api/users/{id}/2fa/disable`: Desativar 2FA
 - `POST /api/users/{id}/2fa/backup-codes`: Regenerar códigos de backup
 - `GET /api/users/{id}/2fa/status`: Verificar status do 2FA
 
-### Keystroke Dynamics Endpoints 🎹
+### Keystroke Dynamics Endpoints 
 - `POST /api/users/{id}/keystroke/register`: Registrar padrão de digitação
 - `POST /api/users/{id}/keystroke/verify`: Verificar padrão de digitação (com proteção contra ataques de força bruta)
 - `PUT /api/users/{id}/keystroke/toggle`: Habilitar/desabilitar verificação
 - `GET /api/users/{id}/keystroke/status`: Verificar status da verificação
 
-### Health Check Endpoints ✅
+### Health Check Endpoints 
 - `GET /api/health`: Verificar saúde da API
 - `GET /api/health/version`: Obter versão da API
 
-### Admin Endpoints 👑
+### Admin Endpoints 
 - `POST /api/admin/clean-tokens`: Limpar tokens expirados da lista negra
 - `POST /api/admin/clean-verification-codes`: Limpar códigos de verificação expirados
 - `POST /api/admin/clean-sessions`: Limpar sessões expiradas
 
-## Security Features 🔒
+## Security Features 
 
 1. **JWT Authentication**: Autenticação segura baseada em tokens
 2. **Password Hashing**: Armazenamento seguro de senhas com bcrypt e Argon2
@@ -636,8 +636,11 @@ Configura rotas da API e middleware.
 14. **Detecção de Anomalias**: Identificação de padrões anômalos em tentativas de verificação
 15. **Proteção contra Força Bruta**: Mecanismos avançados para prevenir ataques de força bruta
 16. **Monitoramento de Segurança**: Monitoramento contínuo de atividades suspeitas
-17. **Verificação por Email após Login**: Verificação adicional de segurança com código enviado por email após login 📧
-18. **Gerenciamento de Dispositivos**: Controle completo sobre dispositivos conectados 📱
-19. **Múltiplos Emails de Recuperação**: Suporte para cadastrar e verificar múltiplos emails de recuperação 📧
-20. **OAuth Authentication**: Autenticação via provedores sociais (Google, Facebook, Microsoft, GitHub, Apple) 🌐
-</rewritten_file> 
+17. **Verificação por Email após Login**: Verificação adicional de segurança com código enviado por email após login 
+18. **Gerenciamento de Dispositivos**: Controle completo sobre dispositivos conectados 
+19. **Múltiplos Emails de Recuperação**: Suporte para cadastrar e verificar múltiplos emails de recuperação 
+20. **OAuth Authentication**: Autenticação via provedores sociais (Google, Facebook, Microsoft, GitHub, Apple) 
+21. **Token Validation Caching**: Cache em memória (Moka) para resultados de validação de token JWT, acelerando requisições subsequentes com o mesmo token. 
+
+---
+*Este índice foi gerado automaticamente e pode ser atualizado conforme o projeto evolui.*

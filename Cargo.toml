@@ -68,6 +68,7 @@ validator = { version = "0.16.1", features = ["derive"] }
 rustc_version_runtime = "0.2.1"
 tokio = { version = "1.32.0", features = ["full", "sync", "time"] }
 woothee = "0.13.0" # Parser de User-Agent para detecção de dispositivos
+moka = { version = "0.12", features = ["future"] } # Cache em memória assíncrono ⚡️
 
 [dev-dependencies]
 actix-rt = "2.9.0"

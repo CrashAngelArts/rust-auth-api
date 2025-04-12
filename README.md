@@ -21,6 +21,7 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação 
 - Sistema de verificação de emails secundários 🔐
 - Detecção de anomalias e monitoramento de segurança 🛡️
 - Autenticação OAuth com provedores sociais 🌐
+- Cache de validação de token JWT (Moka) para otimizar performance ⚡
 
 ### Funcionalidades 🛠️
 - Sistema completo de autenticação
@@ -464,6 +465,7 @@ Para reportar bugs ou solicitar novas funcionalidades, abra uma issue no reposit
 - [x] Implementar múltiplos emails de recuperação
 - [x] Adicionar manutenção automática de sessões e tokens
 - [x] Implementar autenticação via OAuth
+- [x] Implementar cache de validação de token (Moka)
 - [ ] Adicionar suporte a múltiplos tenants
 - [ ] Implementar sistema de permissões granular
 - [ ] Adicionar suporte a múltiplos idiomas

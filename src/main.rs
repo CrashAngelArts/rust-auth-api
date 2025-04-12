@@ -19,6 +19,9 @@ use dotenv::dotenv;
 use tracing::{info, error};
 use tracing_actix_web::TracingLogger;
 use middleware::security::configure_security;
+use moka::future::Cache;
+use crate::models::auth::TokenClaims; // Alterado de Session para TokenClaims
+use std::time::Duration;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -78,6 +81,17 @@ async fn main() -> std::io::Result<()> {
         info!("ℹ️ Serviço de email inicializado em modo desabilitado");
     }
     
+    // Inicializa o cache de validação de token com Moka 🚀
+    let token_cache: Cache<String, TokenClaims> = Cache::builder()
+        // Máximo de 10.000 tokens cacheados
+        .max_capacity(10_000)
+        // Expira tokens após 1 hora de inatividade (TTL)
+        .time_to_live(Duration::from_secs(3600)) 
+        // Expira tokens após 24 horas, independente da atividade (opcional, mas bom para limpeza)
+        .time_to_idle(Duration::from_secs(3600 * 24))
+        .build();
+    info!("✅ Cache de validação de token (Moka) inicializado com sucesso");
+
     // Configura os middlewares de segurança
     let (security_headers, csrf_protection) = configure_security(&config.jwt.secret);
     
@@ -98,6 +112,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(pool.clone()))
             .app_data(web::Data::new(server_config.clone()))
             .app_data(web::Data::new(email_service.clone()))
+            .app_data(web::Data::new(token_cache.clone())) // Adiciona o cache aos dados da app
             .app_data(web::JsonConfig::default().limit(4096))
             .app_data(cookie_key.clone())
             // Servir arquivos estáticos da pasta 'static'

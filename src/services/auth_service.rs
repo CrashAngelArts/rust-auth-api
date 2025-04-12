@@ -17,6 +17,7 @@ use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use sha2::{Digest, Sha256};
 use uuid::Uuid; // Importar Uuid
+use moka::future::Cache; // Importar Moka Cache
 
 pub struct AuthService;
 
@@ -577,16 +578,37 @@ impl AuthService {
 
 
     // Valida um token JWT
-    pub fn validate_token(token: &str, jwt_secret: &str) -> Result<TokenClaims, ApiError> {
-        let validation = Validation::default();
+    pub async fn validate_token( // Tornar async
+        token: &str, 
+        jwt_secret: &str, 
+        cache: &Cache<String, TokenClaims> // Adicionar parâmetro do cache
+    ) -> Result<TokenClaims, ApiError> {
+        // 1. Verificar cache primeiro
+        if let Some(claims) = cache.get(token).await { // Usar .await
+            info!("✅ Token validado via cache");
+            return Ok(claims);
+        }
 
-        let token_data = decode::<TokenClaims>(
-            token,
-            &DecodingKey::from_secret(jwt_secret.as_bytes()),
-            &validation,
-        )?;
+        // 2. Se não estiver no cache, decodificar e validar
+        let decoding_key = DecodingKey::from_secret(jwt_secret.as_bytes());
+        let validation = Validation::default(); // TODO: Adicionar validação de audiência/issuer se necessário
 
-        Ok(token_data.claims)
+        // Decodifica o token
+        let token_data = decode::<TokenClaims>(token, &decoding_key, &validation)
+            .map_err(|e| {
+                warn!("🔒 Falha na decodificação do token: {}", e);
+                ApiError::AuthenticationError(format!("Falha na decodificação: {}", e)) // Usar AuthenticationError
+            })?;
+
+        // TODO: Verificar se o token está na blacklist aqui
+        // Exemplo: if is_token_blacklisted(pool, &token_data.claims.jti).await { return Err(...) }
+
+        // 3. Inserir no cache após validação bem-sucedida
+        // Usamos token.to_string() porque a chave precisa ser 'Owned'
+        cache.insert(token.to_string(), token_data.claims.clone()).await; // Usar .await
+        info!("🔑 Token validado e inserido no cache");
+
+        Ok(token_data.claims) // Retorna as claims do token válido
     }
 
     // Gera um token JWT
@@ -807,7 +829,7 @@ impl AuthService {
     }
     
     // Gera tokens de autenticação para um usuário
-    pub fn generate_auth_tokens(pool: &DbPool, user: &User) -> Result<AuthResponse, ApiError> {
+    pub fn generate_auth_tokens(pool: &DbPool, user: &User) -> Result<AuthResponse, ApiError> { // Manter síncrono por enquanto
         // Obtém a configuração
         let conn = pool.get()?;
         let config_result = conn.query_row(

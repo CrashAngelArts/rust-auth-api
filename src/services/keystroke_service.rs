@@ -1,6 +1,7 @@
-use crate::db::DbPool;
 use crate::errors::ApiError;
-use crate::models::keystroke_dynamics::{KeystrokeDynamics, KeystrokeStatusResponse, KeystrokeVerificationResponse};
+use crate::models::user::User;
+use crate::models::keystroke_dynamics::{KeystrokeStatusResponse, KeystrokeVerificationResponse};
+use crate::db::DbPool;
 use chrono::Utc;
 use tracing::info;
 

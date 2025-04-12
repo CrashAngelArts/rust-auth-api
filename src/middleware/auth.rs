@@ -10,6 +10,9 @@ use std::future::Future;
 use std::pin::Pin;
 use tracing::warn;
 use std::rc::Rc;
+use actix_web::web;
+use moka::future::Cache;
+use tracing::error; 
 
 // Estrutura para representar um usuário autenticado
 #[derive(Debug, Clone)]
@@ -107,26 +110,44 @@ where
         let service = Rc::clone(&self.service);
         let jwt_secret = self.jwt_secret.clone();
 
-        Box::pin(async move {
-            // Extrai o token do cabeçalho Authorization
-            let auth_header = req
-                .headers()
-                .get("Authorization")
-                .map(|h| h.to_str().unwrap_or_default())
-                .unwrap_or_default();
+        // Obter o cache de token dos dados da aplicação (referência)
+        let token_cache_data = req.app_data::<web::Data<Cache<String, TokenClaims>>>();
 
-            // Verifica se o token está no formato Bearer
-            if !auth_header.starts_with("Bearer ") {
-                return Err(ApiError::AuthenticationError("Token não fornecido".to_string()).into());
+        // Extrair o token do cabeçalho (Option<&str>)
+        let token_opt = req
+            .headers()
+            .get("Authorization")
+            .and_then(|h| h.to_str().ok())
+            .filter(|s| s.starts_with("Bearer "))
+            .map(|s| &s[7..]);
+        
+        // Precisamos de uma cópia 'Owned' do token para o contexto async
+        let token_owned_opt: Option<String> = token_opt.map(str::to_string);
+        
+        // Obter referência clonável ao cache
+        let cache_clone = match token_cache_data {
+            Some(cache) => cache.clone(), // Clona o web::Data<Cache>, que é barato (Arc)
+            None => {
+                return Box::pin(async move {
+                    error!(" Cache de token não encontrado nos dados da aplicação!");
+                    Err(ApiError::InternalServerError("Erro interno de configuração do servidor".to_string()).into())
+                });
             }
+        };
 
-            // Extrai o token
-            let token = &auth_header[7..];
+        Box::pin(async move {
+            // Validar apenas se o token foi extraído corretamente
+            let token = match token_owned_opt {
+                Some(t) => t,
+                None => {
+                     return Err(ApiError::AuthenticationError("Token não fornecido ou mal formatado".to_string()).into());
+                }
+            };
 
-            // Valida o token
-            match AuthService::validate_token(token, &jwt_secret) {
+            // Valida o token usando o serviço e o cache
+            match AuthService::validate_token(&token, &jwt_secret, &cache_clone).await { // Passar referência ao cache
                 Ok(claims) => {
-                    // Adiciona as claims ao contexto da requisição
+                    // Adiciona as claims ao contexto da requisição ORIGINAL
                     req.extensions_mut().insert(claims);
                     
                     // Adiciona o ID da sessão para uso no gerenciamento de dispositivos
@@ -139,8 +160,8 @@ where
                     Ok(res)
                 }
                 Err(e) => {
-                    warn!("🔒 Falha na autenticação: {}", e);
-                    Err(ApiError::AuthenticationError("Token inválido ou expirado".to_string()).into())
+                    warn!(" Falha na autenticação via middleware: {}", e);
+                    Err(e.into()) // Retornar o erro de validação
                 }
             }
         })
