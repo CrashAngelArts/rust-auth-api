@@ -24,12 +24,15 @@ rust-auth-api/
 │   │   └── mod.rs
 │   ├── controllers/
 │   │   ├── auth_controller.rs
+│   │   ├── device_controller.rs
+│   │   ├── email_verification_controller.rs
 │   │   ├── health_controller.rs
+│   │   ├── keystroke_controller.rs
 │   │   ├── mod.rs
-│   │   ├── user_controller.rs
-│   │   ├── two_factor_controller.rs
+│   │   ├── recovery_email_controller.rs
 │   │   ├── token_controller.rs
-│   │   └── keystroke_controller.rs
+│   │   ├── two_factor_controller.rs
+│   │   └── user_controller.rs
 │   ├── db/
 │   │   └── [database files]
 │   ├── errors/
@@ -39,28 +42,38 @@ rust-auth-api/
 │   ├── middleware/
 │   │   ├── auth.rs
 │   │   ├── cors.rs
+│   │   ├── email_verification.rs
 │   │   ├── error.rs
+│   │   ├── keystroke_rate_limiter.rs
 │   │   ├── logger.rs
 │   │   ├── mod.rs
-│   │   └── rate_limiter.rs
+│   │   ├── rate_limiter.rs
+│   │   └── security.rs
 │   ├── models/
 │   │   ├── auth.rs
+│   │   ├── device.rs
+│   │   ├── email_verification.rs
+│   │   ├── keystroke_dynamics.rs
 │   │   ├── mod.rs
+│   │   ├── recovery_email.rs
 │   │   ├── response.rs
-│   │   ├── user.rs
-│   │   ├── two_factor.rs
 │   │   ├── token.rs
-│   │   └── keystroke_dynamics.rs
+│   │   ├── two_factor.rs
+│   │   └── user.rs
 │   ├── routes/
 │   │   └── mod.rs
 │   ├── services/
 │   │   ├── auth_service.rs
+│   │   ├── device_service.rs
 │   │   ├── email_service.rs
+│   │   ├── email_verification_service.rs
+│   │   ├── keystroke_security_service.rs
+│   │   ├── keystroke_service.rs
 │   │   ├── mod.rs
-│   │   ├── user_service.rs
-│   │   ├── two_factor_service.rs
+│   │   ├── recovery_email_service.rs
 │   │   ├── token_service.rs
-│   │   └── keystroke_service.rs
+│   │   ├── two_factor_service.rs
+│   │   └── user_service.rs
 │   └── utils/
 │       └── [utility files]
 ├── target/
@@ -71,33 +84,33 @@ rust-auth-api/
 ## Core Files
 
 ### main.rs
-The entry point of the application that initializes and starts the web server.
+O ponto de entrada da aplicação que inicializa e inicia o servidor web.
 
-**Main Functions:**
-- `main()`: Initializes the application, loads configuration, sets up database connection, and starts the web server.
+**Funções Principais:**
+- `main()`: Inicializa a aplicação, carrega configuração, configura conexão com banco de dados e inicia o servidor web.
 
 ### lib.rs
-Exports all the modules for use in other parts of the application.
+Exporta todos os módulos para uso em outras partes da aplicação.
 
 ## Modules
 
 ### Config Module (`src/config/`)
 
 #### mod.rs
-Manages application configuration loaded from environment variables.
+Gerencia a configuração da aplicação carregada de variáveis de ambiente.
 
 **Structs:**
-- `Config`: Main configuration container
-- `ServerConfig`: Server-specific settings (host, port)
-- `DatabaseConfig`: Database connection settings
-- `JwtConfig`: JWT authentication settings
-- `EmailConfig`: Email service configuration
-- `SecurityConfig`: Security settings like password hashing and rate limiting
-- `CorsConfig`: CORS policy configuration
+- `Config`: Contêiner principal de configuração
+- `ServerConfig`: Configurações específicas do servidor (host, porta)
+- `DatabaseConfig`: Configurações de conexão com banco de dados
+- `JwtConfig`: Configurações de autenticação JWT
+- `EmailConfig`: Configuração do serviço de email
+- `SecurityConfig`: Configurações de segurança como hash de senha e rate limiting
+- `CorsConfig`: Configuração da política CORS
 
 **Functions:**
-- `Config::from_env()`: Loads configuration from environment variables
-- `load_config()`: Helper function to load the configuration
+- `Config::from_env()`: Carrega configuração de variáveis de ambiente
+- `load_config()`: Função auxiliar para carregar a configuração
 
 ### Controllers Module (`src/controllers/`) 🎮
 
@@ -113,6 +126,16 @@ Lida com requisições HTTP relacionadas à autenticação.
 - `unlock_account()`: Desbloqueia uma conta bloqueada
 - `me()`: Retorna as informações do usuário autenticado atual
 
+#### device_controller.rs
+Lida com requisições HTTP relacionadas ao gerenciamento de dispositivos conectados 📱
+
+**Functions:**
+- `list_devices()`: Lista todos os dispositivos conectados à conta do usuário
+- `get_device()`: Obtém detalhes de um dispositivo específico
+- `update_device()`: Atualiza informações de um dispositivo (como nome personalizado)
+- `revoke_device()`: Revoga acesso de um dispositivo
+- `clean_expired_sessions()`: Limpa sessões expiradas (admin)
+
 #### email_verification_controller.rs
 Lida com requisições HTTP relacionadas à verificação por email após login.
 
@@ -120,6 +143,16 @@ Lida com requisições HTTP relacionadas à verificação por email após login.
 - `verify_email_code()`: Verifica um código enviado por email após login 📧
 - `resend_verification_code()`: Reenvia o código de verificação por email 📨
 - `clean_expired_codes()`: Limpa códigos de verificação expirados 🧹
+
+#### recovery_email_controller.rs
+Gerencia os emails de recuperação secundários para contas de usuário.
+
+**Functions:**
+- `list_recovery_emails()`: Lista todos os emails de recuperação do usuário
+- `add_recovery_email()`: Adiciona um novo email de recuperação
+- `verify_recovery_email()`: Verifica um email de recuperação recém-adicionado
+- `remove_recovery_email()`: Remove um email de recuperação
+- `resend_verification_email()`: Reenvia email de verificação para um email de recuperação
 
 #### two_factor_controller.rs
 Lida com requisições HTTP relacionadas à autenticação de dois fatores.
@@ -150,23 +183,32 @@ Lida com requisições HTTP relacionadas à análise de ritmo de digitação.
 - `get_keystroke_status()`: Obtém status da verificação
 
 #### user_controller.rs
-Handles user-related HTTP requests.
+Lida com requisições HTTP relacionadas aos usuários.
 
 **Functions:**
-- `list_users()`: Lists all users (admin only)
-- `get_user()`: Gets a specific user by ID
-- `update_user()`: Updates a user's information
-- `delete_user()`: Deletes a user (admin only)
-- `change_password()`: Changes a user's password
+- `list_users()`: Lista todos os usuários (somente admin)
+- `get_user()`: Obtém um usuário específico por ID
+- `update_user()`: Atualiza informações de um usuário
+- `delete_user()`: Exclui um usuário (somente admin)
+- `change_password()`: Altera a senha de um usuário
 
 #### health_controller.rs
-Handles health check endpoints.
+Lida com endpoints de verificação de saúde.
 
 **Functions:**
-- `health_check()`: Returns the API health status
-- `version()`: Returns the API version information
+- `health_check()`: Retorna o status de saúde da API
+- `version()`: Retorna as informações de versão da API
 
 ### Models Module (`src/models/`) 📋
+
+#### device.rs
+Define estruturas de dados para o gerenciamento de dispositivos conectados.
+
+**Structs:**
+- `Device`: Dados de um dispositivo conectado
+- `DeviceResponse`: Resposta da API com informações do dispositivo
+- `UpdateDeviceDto`: DTO para atualizar informações do dispositivo
+- `DeviceList`: Lista de dispositivos conectados
 
 #### email_verification.rs
 Define estruturas de dados para verificação por email após login.
@@ -181,6 +223,20 @@ Define estruturas de dados para verificação por email após login.
 - `EmailVerificationCode::is_expired()`: Verifica se o código expirou
 - `EmailVerificationCode::generate_code()`: Gera um código aleatório de 6 dígitos
 
+#### recovery_email.rs
+Define estruturas de dados para emails de recuperação secundários.
+
+**Structs:**
+- `RecoveryEmail`: Modelo para email de recuperação
+- `RecoveryEmailResponse`: Resposta da API com informações do email de recuperação
+- `AddRecoveryEmailDto`: DTO para adicionar um novo email de recuperação
+- `VerifyRecoveryEmailDto`: DTO para verificar um email de recuperação
+
+**Methods:**
+- `RecoveryEmail::new()`: Cria um novo email de recuperação
+- `RecoveryEmail::is_verified()`: Verifica se o email foi verificado
+- `RecoveryEmail::generate_verification_code()`: Gera código de verificação
+
 #### user.rs
 Define estruturas de dados relacionadas ao usuário.
 
@@ -190,6 +246,11 @@ Define estruturas de dados relacionadas ao usuário.
 - `UpdateUserDto`: Objeto de transferência de dados para atualizações de usuário
 - `ChangePasswordDto`: Objeto de transferência de dados para alterações de senha
 - `UserResponse`: Dados do usuário seguros para respostas da API (exclui dados sensíveis)
+
+**Methods:**
+- `User::new()`: Cria um novo usuário
+- `User::full_name()`: Retorna o nome completo do usuário
+- `User::is_locked()`: Verifica se a conta do usuário está bloqueada
 
 #### two_factor.rs
 Define estruturas de dados para autenticação de dois fatores.
@@ -219,35 +280,43 @@ Define estruturas de dados para análise de ritmo de digitação.
 - `KeystrokeVerificationResponse`: Resposta de verificação com similaridade
 - `KeystrokeStatusResponse`: Status da verificação de ritmo de digitação
 
-**Methods:**
-- `User::new()`: Creates a new user
-- `User::full_name()`: Returns the user's full name
-- `User::is_locked()`: Checks if the user account is locked
-
 #### auth.rs
-Defines authentication-related data structures.
+Define estruturas de dados relacionadas à autenticação.
 
 **Structs:**
-- `LoginDto`: Data transfer object for login
-- `RegisterDto`: Data transfer object for registration
-- `RefreshTokenDto`: Data transfer object for token refresh
-- `ForgotPasswordDto`: Data transfer object for password recovery
-- `ResetPasswordDto`: Data transfer object for password reset
-- `UnlockAccountDto`: Data transfer object for account unlocking
-- `TokenClaims`: JWT token claims
-- `AuthResponse`: Authentication response with tokens
-- `Session`: User session information
-- `RefreshToken`: Refresh token data
-- `PasswordResetToken`: Password reset token data
-- `AuthLog`: Authentication event log
+- `LoginDto`: Objeto de transferência de dados para login
+- `RegisterDto`: Objeto de transferência de dados para registro
+- `RefreshTokenDto`: Objeto de transferência de dados para atualização de token
+- `ForgotPasswordDto`: Objeto de transferência de dados para recuperação de senha
+- `ResetPasswordDto`: Objeto de transferência de dados para redefinição de senha
+- `UnlockAccountDto`: Objeto de transferência de dados para desbloqueio de conta
+- `TokenClaims`: Claims do token JWT
+- `AuthResponse`: Resposta de autenticação com tokens
+- `Session`: Informações de sessão do usuário
+- `RefreshToken`: Dados do token de atualização
+- `PasswordResetToken`: Dados do token de redefinição de senha
+- `AuthLog`: Log de eventos de autenticação
 
 #### response.rs
-Defines API response structures.
+Define estruturas de resposta da API.
 
 **Structs:**
-- `ApiResponse<T>`: Generic API response wrapper
+- `ApiResponse<T>`: Wrapper genérico de resposta da API
 
 ### Services Module (`src/services/`)
+
+#### device_service.rs
+Implementa a lógica de negócios para gerenciamento de dispositivos conectados.
+
+**Functions:**
+- `list_devices()`: Lista todos os dispositivos do usuário
+- `get_device()`: Obtém detalhes de um dispositivo específico
+- `update_device()`: Atualiza informações de um dispositivo
+- `revoke_device()`: Revoga acesso de um dispositivo
+- `register_device()`: Registra um novo dispositivo durante login
+- `clean_expired_sessions()`: Limpa sessões expiradas
+- `parse_user_agent()`: Extrai informações de um user-agent
+- `get_location_from_ip()`: Tenta obter localização a partir de um IP
 
 #### email_verification_service.rs
 Implementa a lógica de negócios para verificação por email após login.
@@ -259,55 +328,68 @@ Implementa a lógica de negócios para verificação por email após login.
 - `clean_expired_codes()`: Limpa códigos expirados
 - `send_verification_email()`: Envia email com código de verificação
 
-#### auth_service.rs
-Implements authentication business logic.
+#### recovery_email_service.rs
+Implementa a lógica de negócios para gerenciamento de emails de recuperação secundários.
 
 **Functions:**
-- `register()`: Registers a new user
-- `login()`: Authenticates a user
-- `forgot_password()`: Initiates password recovery
-- `reset_password()`: Resets a user's password
-- `refresh_token()`: Refreshes an access token
-- `unlock_account()`: Unlocks a locked account
-- `validate_token()`: Validates a JWT token
-- `generate_jwt()`: Generates a JWT token
-- `create_session()`: Creates a new user session
-- `log_auth_event()`: Logs authentication events
-- `parse_expiration()`: Parses token expiration time
-- `save_refresh_token()`: Saves a refresh token
-- `find_and_validate_refresh_token()`: Finds and validates a refresh token
-- `revoke_refresh_token()`: Revokes a specific refresh token
-- `hash_token()`: Hashes a token for secure storage
-- `revoke_all_user_refresh_tokens()`: Revokes all refresh tokens for a user
+- `list_recovery_emails()`: Lista todos os emails de recuperação do usuário
+- `add_recovery_email()`: Adiciona um novo email de recuperação
+- `verify_email()`: Verifica um novo email de recuperação
+- `remove_recovery_email()`: Remove um email de recuperação
+- `resend_verification_email()`: Reenvia email de verificação
+- `get_verified_recovery_emails()`: Obtém todos os emails de recuperação verificados
+
+#### auth_service.rs
+Implementa a lógica de negócios para autenticação.
+
+**Functions:**
+- `register()`: Registra um novo usuário
+- `login()`: Autentica um usuário
+- `forgot_password()`: Inicia recuperação de senha
+- `reset_password()`: Redefine a senha de um usuário
+- `refresh_token()`: Atualiza um token de acesso
+- `unlock_account()`: Desbloqueia uma conta bloqueada
+- `validate_token()`: Valida um token JWT
+- `generate_jwt()`: Gera um token JWT
+- `create_session()`: Cria uma nova sessão de usuário
+- `log_auth_event()`: Registra eventos de autenticação
+- `parse_expiration()`: Analisa o tempo de expiração do token
+- `save_refresh_token()`: Salva um token de atualização
+- `find_and_validate_refresh_token()`: Encontra e valida um token de atualização
+- `revoke_refresh_token()`: Revoga um token de atualização específico
+- `hash_token()`: Gera hash de um token para armazenamento seguro
+- `revoke_all_user_refresh_tokens()`: Revoga todos os tokens de atualização de um usuário
 
 #### email_service.rs
-Handles email sending functionality.
+Implementa envio de emails.
 
 **Struct:**
-- `EmailService`: Service for sending emails
+- `EmailService`: Serviço para envio de emails
 
 **Methods:**
-- `new()`: Creates a new email service
-- `send_welcome_email()`: Sends welcome email to new users
-- `send_password_reset_email()`: Sends password reset instructions
-- `send_account_locked_email()`: Sends account locked notification
-- `send_email()`: Generic method to send emails
+- `new()`: Cria um novo serviço de email
+- `send_welcome_email()`: Envia email de boas-vindas para novos usuários
+- `send_password_reset_email()`: Envia instruções de redefinição de senha
+- `send_account_locked_email()`: Envia notificação de conta bloqueada
+- `send_verification_email()`: Envia email de verificação após login
+- `send_recovery_email_verification()`: Envia email de verificação para um email secundário
+- `send_email()`: Método genérico para envio de emails
 
 #### user_service.rs
-Implements user management business logic.
+Implementa a lógica de negócios para gerenciamento de usuários.
 
 **Functions:**
-- `create_user()`: Creates a new user
-- `get_user_by_id()`: Retrieves a user by ID
-- `get_user_by_email()`: Retrieves a user by email
-- `get_user_by_username()`: Retrieves a user by username
-- `get_user_by_email_or_username()`: Retrieves a user by email or username
-- `update_user()`: Updates a user's information
-- `delete_user()`: Deletes a user
-- `change_password()`: Changes a user's password
-- `hash_password()`: Hashes a password
-- `verify_password()`: Verifies a password against its hash
-- `list_users()`: Lists all users
+- `create_user()`: Cria um novo usuário
+- `get_user_by_id()`: Obtém um usuário por ID
+- `get_user_by_email()`: Obtém um usuário por email
+- `get_user_by_username()`: Obtém um usuário por nome de usuário
+- `get_user_by_email_or_username()`: Obtém um usuário por email ou nome de usuário
+- `update_user()`: Atualiza as informações de um usuário
+- `delete_user()`: Exclui um usuário
+- `change_password()`: Altera a senha de um usuário
+- `hash_password()`: Gera hash de uma senha
+- `verify_password()`: Verifica uma senha contra seu hash
+- `list_users()`: Lista todos os usuários
 
 #### keystroke_service.rs
 Implementa a lógica de negócios para análise de ritmo de digitação.
@@ -317,6 +399,7 @@ Implementa a lógica de negócios para análise de ritmo de digitação.
 - `verify_keystroke_pattern()`: Verifica um padrão durante o login
 - `toggle_keystroke_verification()`: Habilita/desabilita verificação
 - `get_keystroke_status()`: Obtém o status atual da verificação
+- `calculate_similarity()`: Calcula a similaridade entre padrões de digitação
 
 #### keystroke_security_service.rs
 Implementa monitoramento de segurança e detecção de anomalias para keystroke dynamics.
@@ -331,6 +414,30 @@ Implementa monitoramento de segurança e detecção de anomalias para keystroke 
 - `calculate_anomaly_score()`: Calcula pontuações de anomalia para padrões de digitação
 - `is_user_suspicious()`: Verifica se um usuário está sob suspeita
 
+#### token_service.rs
+Implementa a lógica de negócios para gerenciamento de tokens JWT.
+
+**Functions:**
+- `rotate_token()`: Rotaciona um token JWT mantendo a família
+- `revoke_token()`: Revoga um token específico
+- `revoke_all_tokens()`: Revoga todos os tokens de um usuário
+- `blacklist_token()`: Adiciona um token à lista negra
+- `is_token_blacklisted()`: Verifica se um token está na lista negra
+- `clean_expired_tokens()`: Limpa tokens expirados da lista negra
+- `update_token_family()`: Atualiza a família de tokens de um usuário
+
+#### two_factor_service.rs
+Implementa a lógica de negócios para autenticação de dois fatores.
+
+**Functions:**
+- `setup_2fa()`: Configura 2FA para um usuário e gera QR code
+- `enable_2fa()`: Ativa 2FA após verificar código TOTP
+- `disable_2fa()`: Desativa 2FA após verificação
+- `verify_totp_code()`: Verifica um código TOTP
+- `generate_backup_codes()`: Gera códigos de backup para recuperação
+- `verify_backup_code()`: Verifica um código de backup
+- `get_2fa_status()`: Obtém o status atual do 2FA
+
 ### Middleware Module (`src/middleware/`)
 
 #### email_verification.rs
@@ -343,60 +450,67 @@ Implementa middleware para verificação por email após login.
 - `EmailVerificationCheck::new()`: Cria um novo middleware de verificação por email
 
 #### auth.rs
-Implements authentication middleware.
+Implementa middleware de autenticação.
 
 **Structs:**
-- `JwtAuth`: Middleware for JWT authentication
-- `AdminAuth`: Middleware for admin authorization
+- `JwtAuth`: Middleware para autenticação JWT
+- `AdminAuth`: Middleware para autorização de admin
 
 **Methods:**
-- `JwtAuth::new()`: Creates a new JWT authentication middleware
-- `AdminAuth::new()`: Creates a new admin authorization middleware
+- `JwtAuth::new()`: Cria um novo middleware de autenticação JWT
+- `AdminAuth::new()`: Cria um novo middleware de autorização de admin
 
 #### cors.rs
-Configures CORS (Cross-Origin Resource Sharing) policies.
+Configura políticas CORS (Cross-Origin Resource Sharing).
 
 **Functions:**
-- `configure_cors()`: Configures CORS settings based on application config
+- `configure_cors()`: Configura definições CORS com base na configuração da aplicação
 
 #### error.rs
-Handles error transformation for consistent API responses.
+Lida com transformação de erros para respostas de API consistentes.
 
 **Struct:**
-- `ErrorHandler`: Middleware for consistent error handling
+- `ErrorHandler`: Middleware para tratamento consistente de erros
 
 #### logger.rs
-Logs HTTP requests and responses.
+Registra requisições e respostas HTTP.
 
 **Struct:**
-- `RequestLogger`: Middleware for request logging
+- `RequestLogger`: Middleware para registro de requisições
 
 #### rate_limiter.rs
-Implements rate limiting to prevent abuse.
+Implementa limitação de taxa para prevenir abusos.
 
 **Struct:**
-- `RateLimiter`: Middleware for rate limiting requests
+- `RateLimiter`: Middleware para limitação de taxa de requisições
 
 **Methods:**
-- `RateLimiter::new()`: Creates a new rate limiter with specified limits
+- `RateLimiter::new()`: Cria um novo limitador de taxa com limites especificados
 
 #### keystroke_rate_limiter.rs
-Implements specialized rate limiting for keystroke dynamics verification.
+Implementa limitação de taxa especializada para verificação de ritmo de digitação.
 
 **Struct:**
-- `KeystrokeRateLimiter`: Middleware for rate limiting keystroke verification attempts
+- `KeystrokeRateLimiter`: Middleware para limitação de taxa de tentativas de verificação de keystroke
 
 **Methods:**
-- `KeystrokeRateLimiter::new()`: Creates a new keystroke rate limiter with specified limits
-- `clean_keystroke_rate_limit_entries()`: Cleans expired rate limit entries
+- `KeystrokeRateLimiter::new()`: Cria um novo limitador de taxa de keystroke com limites especificados
+- `clean_keystroke_rate_limit_entries()`: Limpa entradas expiradas do limitador de taxa
+
+#### security.rs
+Implementa configurações de segurança para a API.
+
+**Functions:**
+- `configure_security()`: Configura headers de segurança e proteção CSRF
+- `get_secure_headers()`: Cria headers de segurança padrão
 
 ### Routes Module (`src/routes/`)
 
 #### mod.rs
-Configures API routes and middleware.
+Configura rotas da API e middleware.
 
 **Functions:**
-- `configure_routes()`: Sets up all API routes with their respective middleware
+- `configure_routes()`: Configura todas as rotas da API com seus respectivos middlewares
 
 ## API Endpoints
 
@@ -415,7 +529,19 @@ Configures API routes and middleware.
 ### Email Verification Endpoints 📧
 - `POST /api/auth/email-verification/verify`: Verificar código enviado por email após login
 - `POST /api/auth/email-verification/resend`: Reenviar código de verificação por email
-- `POST /api/admin/clean-verification-codes`: Limpar códigos de verificação expirados (admin)
+
+### Device Management Endpoints 📱
+- `GET /api/auth/devices`: Listar todos os dispositivos conectados
+- `GET /api/auth/devices/{id}`: Obter detalhes de um dispositivo
+- `PUT /api/auth/devices/{id}`: Atualizar informações de um dispositivo
+- `DELETE /api/auth/devices/{id}`: Revogar acesso de um dispositivo
+
+### Recovery Email Endpoints 📧
+- `GET /api/auth/recovery-emails`: Listar emails de recuperação
+- `POST /api/auth/recovery-emails`: Adicionar novo email de recuperação
+- `POST /api/auth/recovery-emails/verify`: Verificar email de recuperação
+- `DELETE /api/auth/recovery-emails/{id}`: Remover email de recuperação
+- `POST /api/auth/recovery-emails/{id}/resend`: Reenviar email de verificação
 
 ### User Endpoints 👤
 - `GET /api/users`: Listar todos os usuários (somente admin)
@@ -444,6 +570,7 @@ Configures API routes and middleware.
 ### Admin Endpoints 👑
 - `POST /api/admin/clean-tokens`: Limpar tokens expirados da lista negra
 - `POST /api/admin/clean-verification-codes`: Limpar códigos de verificação expirados
+- `POST /api/admin/clean-sessions`: Limpar sessões expiradas
 
 ## Security Features 🔒
 
@@ -464,4 +591,6 @@ Configures API routes and middleware.
 15. **Proteção contra Força Bruta**: Mecanismos avançados para prevenir ataques de força bruta
 16. **Monitoramento de Segurança**: Monitoramento contínuo de atividades suspeitas
 17. **Verificação por Email após Login**: Verificação adicional de segurança com código enviado por email após login 📧
-17. **Verificação por Email após Login**: Verificação adicional de segurança com código enviado por email após login 📧
+18. **Gerenciamento de Dispositivos**: Controle completo sobre dispositivos conectados 📱
+19. **Múltiplos Emails de Recuperação**: Suporte para cadastrar e verificar múltiplos emails de recuperação 📧
+</rewritten_file> 

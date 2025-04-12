@@ -19,6 +19,7 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação 
 - Gerenciamento de dispositivos conectados 📱
 - Múltiplos emails de recuperação verificados 📧
 - Sistema de verificação de emails secundários 🔐
+- Detecção de anomalias e monitoramento de segurança 🛡️
 
 ### Funcionalidades 🛠️
 - Sistema completo de autenticação
@@ -35,6 +36,7 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação 
 - Revogação de tokens em todos os dispositivos
 - Verificação por email após login com códigos de 6 dígitos 📨
 - Gerenciamento completo de dispositivos conectados (listar, visualizar, atualizar, revogar) 📱
+- Manutenção automática de tokens, códigos e sessões expiradas 🧹
 
 ## Requisitos
 
@@ -174,10 +176,12 @@ SECURITY_BLOCK_DURATION=300      # Duração do bloqueio em segundos
 ### Admin (`/api/admin`) 👑
 
 - `POST /clean-tokens` - Limpar tokens expirados da lista negra
+- `POST /clean-verification-codes` - Limpar códigos de verificação expirados
+- `POST /clean-sessions` - Limpar sessões expiradas
 
 ### Rota Raiz
 
-- `GET /` - Mensagem de boas-vindas
+- `GET /` - Mensagem de boas-vindas e página de documentação da API
 
 ## Middleware 🔁
 
@@ -193,6 +197,7 @@ SECURITY_BLOCK_DURATION=300      # Duração do bloqueio em segundos
 - Keystroke Rate Limiter
 - Keystroke Security Monitoring
 - Email Verification Check
+- Security Headers
 
 ## Modelos de Dados 📊
 
@@ -269,6 +274,23 @@ SECURITY_BLOCK_DURATION=300      # Duração do bloqueio em segundos
 - is_current: bool
 - created_at: DateTime
 
+### EmailVerificationCode
+- id: String
+- user_id: String
+- code: String
+- expires_at: DateTime
+- created_at: DateTime
+
+### RecoveryEmail
+- id: String
+- user_id: String
+- email: String
+- is_verified: bool
+- verification_code: Option<String>
+- verification_expires_at: Option<DateTime>
+- created_at: DateTime
+- updated_at: DateTime
+
 ## Segurança 🛡️
 
 - Senhas são armazenadas com hash bcrypt ou Argon2
@@ -291,6 +313,7 @@ SECURITY_BLOCK_DURATION=300      # Duração do bloqueio em segundos
 - Gerenciamento de dispositivos conectados com detecção automática de tipo de dispositivo 📱
 - Rastreamento de sessões ativas com informações detalhadas sobre cada dispositivo 🔍
 - Capacidade de revogar acesso a dispositivos específicos 🔒
+- Headers de segurança configuráveis como X-Content-Type-Options, X-Frame-Options, etc.
 
 ## Gerenciamento de Dispositivos 📱
 
@@ -315,6 +338,18 @@ O sistema agora suporta múltiplos emails de recuperação com verificação obr
 - Reenvio de emails de verificação quando necessário
 
 Esta funcionalidade melhora significativamente a segurança e a experiência do usuário, oferecendo múltiplas opções para recuperação de conta em caso de perda de acesso ao email principal. 🔐
+
+## Manutenção do Sistema 🧹
+
+O sistema possui rotinas de manutenção automática para:
+
+- Limpeza de tokens expirados na lista negra
+- Remoção de códigos de verificação de email expirados
+- Limpeza de sessões de dispositivos expiradas
+- Monitoramento de atividades suspeitas
+- Registro detalhado de eventos de segurança
+
+Essas rotinas garantem que o sistema permaneça eficiente e seguro ao longo do tempo.
 
 ## Logs
 
@@ -360,6 +395,8 @@ Para reportar bugs ou solicitar novas funcionalidades, abra uma issue no reposit
 - [x] Implementar proteção contra ataques de força bruta em keystroke
 - [x] Implementar verificação por email após login
 - [x] Implementar gerenciamento de dispositivos conectados
+- [x] Implementar múltiplos emails de recuperação
+- [x] Adicionar manutenção automática de sessões e tokens
 - [ ] Implementar autenticação via OAuth
 - [ ] Adicionar suporte a múltiplos tenants
 - [ ] Implementar sistema de permissões granular
