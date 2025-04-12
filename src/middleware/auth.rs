@@ -3,12 +3,49 @@ use crate::models::auth::TokenClaims;
 use crate::services::auth_service::AuthService;
 use actix_web::{
     dev::{Service, ServiceRequest, ServiceResponse, Transform, forward_ready},
-    Error, HttpMessage,
+    Error, HttpMessage, FromRequest,
 };
 use futures::future::{ready, Ready, LocalBoxFuture};
-
+use std::future::Future;
+use std::pin::Pin;
 use tracing::warn;
 use std::rc::Rc;
+
+// Estrutura para representar um usuário autenticado
+#[derive(Debug, Clone)]
+pub struct AuthenticatedUser {
+    pub id: String,
+    pub username: String,
+    pub email: String,
+    pub is_admin: bool,
+}
+
+// Implementação do FromRequest para obter o usuário autenticado
+impl FromRequest for AuthenticatedUser {
+    type Error = Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self, Self::Error>>>>;
+
+    fn from_request(req: &actix_web::HttpRequest, _: &mut actix_web::dev::Payload) -> Self::Future {
+        let req = req.clone();
+        
+        Box::pin(async move {
+            // Obter as claims do token JWT das extensões da requisição
+            let claims = req.extensions().get::<TokenClaims>()
+                .cloned()
+                .ok_or_else(|| ApiError::AuthenticationError("Usuário não autenticado".to_string()))?;
+            
+            // Criar o usuário autenticado a partir das claims
+            let user = AuthenticatedUser {
+                id: claims.sub,
+                username: claims.username,
+                email: claims.email,
+                is_admin: claims.is_admin,
+            };
+            
+            Ok(user)
+        })
+    }
+}
 
 // Middleware para autenticação JWT
 pub struct JwtAuth {
@@ -91,6 +128,11 @@ where
                 Ok(claims) => {
                     // Adiciona as claims ao contexto da requisição
                     req.extensions_mut().insert(claims);
+                    
+                    // Adiciona o ID da sessão para uso no gerenciamento de dispositivos
+                    if let Some(session_id) = req.headers().get("X-Session-ID").and_then(|h| h.to_str().ok()) {
+                        req.extensions_mut().insert(session_id.to_string());
+                    }
                     
                     // Continua o processamento
                     let res = service.call(req).await?;

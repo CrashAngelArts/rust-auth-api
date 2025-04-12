@@ -7,6 +7,7 @@ use crate::controllers::{
     token_controller,
     keystroke_controller,
     email_verification_controller, // Novo controlador de verificação por email 
+    device_controller, // Novo controlador de gerenciamento de dispositivos 📱
 };
 use crate::middleware::{
     auth::{AdminAuth, JwtAuth},
@@ -75,7 +76,15 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
                             .wrap(jwt_auth.clone())
                             .route("/me", web::get().to(auth_controller::me))
                             // Rota para revogar todos os tokens (logout de todos os dispositivos)
-                            .route("/revoke-all/{id}", web::post().to(token_controller::revoke_all_tokens)),
+                            .route("/revoke-all/{id}", web::post().to(token_controller::revoke_all_tokens))
+                            // Rotas para gerenciamento de dispositivos 📱
+                            .service(
+                                web::scope("/devices")
+                                    .route("", web::get().to(device_controller::list_devices))
+                                    .route("/{device_id}", web::get().to(device_controller::get_device))
+                                    .route("/{device_id}", web::put().to(device_controller::update_device))
+                                    .route("/{device_id}", web::delete().to(device_controller::revoke_device)),
+                            ),
                     )
                     // Rotas para verificação por email após login 📧
                     .service(
@@ -145,7 +154,8 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
                     .wrap(jwt_auth.clone())
                     .wrap(admin_auth.clone())
                     .route("/clean-tokens", web::post().to(token_controller::clean_expired_tokens))
-                    .route("/clean-verification-codes", web::post().to(email_verification_controller::clean_expired_codes)),
+                    .route("/clean-verification-codes", web::post().to(email_verification_controller::clean_expired_codes))
+                    .route("/clean-sessions", web::post().to(device_controller::clean_expired_sessions)),
             ),
     )
     .service(

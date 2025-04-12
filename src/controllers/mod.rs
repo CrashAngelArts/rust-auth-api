@@ -5,3 +5,4 @@ pub mod two_factor_controller;
 pub mod token_controller;
 pub mod keystroke_controller;
 pub mod email_verification_controller;
+pub mod device_controller;

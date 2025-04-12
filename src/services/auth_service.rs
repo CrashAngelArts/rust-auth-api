@@ -6,6 +6,7 @@ use crate::models::auth::{
     RefreshTokenDto, RegisterDto, ResetPasswordDto, Session, TokenClaims, UnlockAccountDto,
 };
 use crate::models::user::{CreateUserDto, User};
+use crate::services::device_service::DeviceService;
 use crate::services::email_service::EmailService;
 use crate::services::user_service::UserService;
 use chrono::{Duration, Utc};
@@ -184,13 +185,13 @@ impl AuthService {
         // 5. Gera o token JWT
         let token = Self::generate_jwt(&user, &config.jwt.secret, &config.jwt.expiration)?;
 
-        // 6. Registra a sessão
-        Self::create_session(
+        // Criar sessão com informações de dispositivo
+        let _session = DeviceService::create_session_with_device_info(
             pool,
-            user.id.clone(),
-            ip_address.clone(),
-            user_agent.clone(),
-            Self::parse_expiration(&config.jwt.expiration)?,
+            &user.id,
+            &ip_address,
+            &user_agent,
+            24, // Duração da sessão em horas
         )?;
 
         // 7. Registra o evento de login
