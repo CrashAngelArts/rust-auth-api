@@ -6,6 +6,7 @@ use crate::controllers::{
     two_factor_controller,
     token_controller,
     keystroke_controller,
+    email_verification_controller, // Novo controlador de verificação por email 
 };
 use crate::middleware::{
     auth::{AdminAuth, JwtAuth},
@@ -14,6 +15,7 @@ use crate::middleware::{
     logger::RequestLogger,
     rate_limiter::RateLimiter,
     keystroke_rate_limiter::KeystrokeRateLimiter,
+    email_verification::EmailVerificationCheck, // Novo middleware de verificação por email 
 };
 use crate::services::keystroke_security_service::KeystrokeSecurityService;
 use actix_web::{web, HttpResponse};
@@ -34,6 +36,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
         config.security.rate_limit_requests,
         config.security.rate_limit_duration,
     );
+    let email_verification_check = EmailVerificationCheck::new(); // Middleware de verificação por email 📧
     
     // Configurar middleware específico para keystroke dynamics
     let keystroke_rate_limiter = KeystrokeRateLimiter::new(
@@ -73,11 +76,19 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
                             .route("/me", web::get().to(auth_controller::me))
                             // Rota para revogar todos os tokens (logout de todos os dispositivos)
                             .route("/revoke-all/{id}", web::post().to(token_controller::revoke_all_tokens)),
+                    )
+                    // Rotas para verificação por email após login 📧
+                    .service(
+                        web::scope("/email-verification")
+                            .wrap(jwt_auth.clone())
+                            .route("/verify", web::post().to(email_verification_controller::verify_email_code))
+                            .route("/resend", web::post().to(email_verification_controller::resend_verification_code)),
                     ),
             )
             .service(
                 web::scope("/users")
                     .wrap(jwt_auth.clone()) // Proteger todas as rotas de usuário
+                    .wrap(email_verification_check.clone()) // Verificar se o usuário confirmou o código de email 📧
                     .service(
                         web::resource("")
                             .wrap(admin_auth.clone()) // Apenas admin pode listar todos
@@ -133,7 +144,8 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
                 web::scope("/admin")
                     .wrap(jwt_auth.clone())
                     .wrap(admin_auth.clone())
-                    .route("/clean-tokens", web::post().to(token_controller::clean_expired_tokens)),
+                    .route("/clean-tokens", web::post().to(token_controller::clean_expired_tokens))
+                    .route("/clean-verification-codes", web::post().to(email_verification_controller::clean_expired_codes)),
             ),
     )
     .service(

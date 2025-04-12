@@ -198,8 +198,8 @@ impl AuthService {
             pool,
             Some(user.id.clone()),
             "login_success".to_string(),
-            ip_address,
-            user_agent,
+            ip_address.clone(),
+            user_agent.clone(),
             None,
         )?;
 
@@ -213,12 +213,34 @@ impl AuthService {
         // Self::revoke_all_user_refresh_tokens(pool, &user.id)?;
         Self::save_refresh_token(pool, &refresh_token_db)?; // Salvar o token com hash no DB
 
-        // 9. Cria a resposta
+        // 9. Gera e envia código de verificação por email
+        let requires_email_verification = config.security.email_verification_enabled;
+        
+        if requires_email_verification {
+            // Importar o serviço de verificação por email
+            use crate::services::email_verification_service::EmailVerificationService;
+            
+            // Gerar e enviar código de verificação
+            match EmailVerificationService::generate_and_send_code(
+                pool,
+                &user,
+                ip_address.clone(),
+                user_agent.clone(),
+                email_service,
+                15, // 15 minutos de expiração
+            ).await {
+                Ok(_) => info!("📧 Código de verificação enviado para: {}", user.email),
+                Err(e) => error!("❌ Falha ao enviar código de verificação para {}: {}", user.email, e),
+            }
+        }
+        
+        // 10. Cria a resposta
         let auth_response = AuthResponse {
             access_token: token,
             token_type: "Bearer".to_string(),
             expires_in: Self::parse_expiration(&config.jwt.expiration)? * 3600, // Converte horas para segundos
             refresh_token: original_refresh_token, // Retornar o token original para o cliente
+            requires_email_verification: requires_email_verification, // Indica se o login requer verificação por email 
         };
 
         info!("✅ Login bem-sucedido para o usuário: {}", user.username);
@@ -379,6 +401,7 @@ impl AuthService {
             token_type: "Bearer".to_string(),
             expires_in: Self::parse_expiration(&config.jwt.expiration)? * 3600,
             refresh_token: refresh_dto.refresh_token, // Retorna o mesmo refresh token
+            requires_email_verification: false, // Não requer verificação por email no refresh
         };
 
         info!("🔄 Token de acesso atualizado para o usuário: {}", user.username);

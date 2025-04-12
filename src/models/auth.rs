@@ -64,6 +64,7 @@ pub struct AuthResponse {
     pub token_type: String,
     pub expires_in: i64, // Em segundos
     pub refresh_token: String, // Adicionar refresh token
+    pub requires_email_verification: bool, // Indica se o login requer verificação por email 📧
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -113,6 +113,14 @@ Lida com requisições HTTP relacionadas à autenticação.
 - `unlock_account()`: Desbloqueia uma conta bloqueada
 - `me()`: Retorna as informações do usuário autenticado atual
 
+#### email_verification_controller.rs
+Lida com requisições HTTP relacionadas à verificação por email após login.
+
+**Functions:**
+- `verify_email_code()`: Verifica um código enviado por email após login 📧
+- `resend_verification_code()`: Reenvia o código de verificação por email 📨
+- `clean_expired_codes()`: Limpa códigos de verificação expirados 🧹
+
 #### two_factor_controller.rs
 Lida com requisições HTTP relacionadas à autenticação de dois fatores.
 
@@ -159,6 +167,19 @@ Handles health check endpoints.
 - `version()`: Returns the API version information
 
 ### Models Module (`src/models/`) 📋
+
+#### email_verification.rs
+Define estruturas de dados para verificação por email após login.
+
+**Structs:**
+- `EmailVerificationCode`: Modelo para armazenar códigos de verificação por email
+- `VerifyEmailCodeDto`: DTO para verificar um código
+- `EmailVerificationResponse`: Resposta para o status de verificação
+
+**Methods:**
+- `EmailVerificationCode::new()`: Cria um novo código de verificação
+- `EmailVerificationCode::is_expired()`: Verifica se o código expirou
+- `EmailVerificationCode::generate_code()`: Gera um código aleatório de 6 dígitos
 
 #### user.rs
 Define estruturas de dados relacionadas ao usuário.
@@ -227,6 +248,16 @@ Defines API response structures.
 - `ApiResponse<T>`: Generic API response wrapper
 
 ### Services Module (`src/services/`)
+
+#### email_verification_service.rs
+Implementa a lógica de negócios para verificação por email após login.
+
+**Functions:**
+- `generate_and_send_code()`: Gera um novo código e envia por email 📧
+- `verify_code()`: Verifica um código enviado pelo usuário
+- `has_pending_code()`: Verifica se o usuário tem um código pendente
+- `clean_expired_codes()`: Limpa códigos expirados
+- `send_verification_email()`: Envia email com código de verificação
 
 #### auth_service.rs
 Implements authentication business logic.
@@ -302,6 +333,15 @@ Implementa monitoramento de segurança e detecção de anomalias para keystroke 
 
 ### Middleware Module (`src/middleware/`)
 
+#### email_verification.rs
+Implementa middleware para verificação por email após login.
+
+**Structs:**
+- `EmailVerificationCheck`: Middleware para verificar se o usuário confirmou o código de email
+
+**Methods:**
+- `EmailVerificationCheck::new()`: Cria um novo middleware de verificação por email
+
 #### auth.rs
 Implements authentication middleware.
 
@@ -372,6 +412,10 @@ Configures API routes and middleware.
 - `POST /api/auth/token/revoke`: Revogar token JWT
 - `POST /api/auth/revoke-all/{id}`: Revogar todos os tokens (logout de todos os dispositivos)
 
+### Email Verification Endpoints 📧
+- `POST /api/auth/email-verification/verify`: Verificar código enviado por email após login
+- `POST /api/auth/email-verification/resend`: Reenviar código de verificação por email
+
 ### User Endpoints 👤
 - `GET /api/users`: Listar todos os usuários (somente admin)
 - `GET /api/users/{id}`: Obter usuário por ID
@@ -398,6 +442,7 @@ Configures API routes and middleware.
 
 ### Admin Endpoints 👑
 - `POST /api/admin/clean-tokens`: Limpar tokens expirados da lista negra
+- `POST /api/admin/clean-verification-codes`: Limpar códigos de verificação expirados
 
 ## Security Features 🔒
 
@@ -417,3 +462,4 @@ Configures API routes and middleware.
 14. **Detecção de Anomalias**: Identificação de padrões anômalos em tentativas de verificação
 15. **Proteção contra Força Bruta**: Mecanismos avançados para prevenir ataques de força bruta
 16. **Monitoramento de Segurança**: Monitoramento contínuo de atividades suspeitas
+17. **Verificação por Email após Login**: Verificação adicional de segurança com código enviado por email após login 📧

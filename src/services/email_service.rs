@@ -288,7 +288,7 @@ impl EmailService {
 
     // Método genérico para envio de emails
     // Método genérico para envio de emails
-    async fn send_email(
+    pub async fn send_email(
         &self,
         to: &str,
         subject: &str,

@@ -57,6 +57,9 @@ pub struct SecurityConfig {
     pub keystroke_rate_limit_requests: Option<usize>, // Número máximo de tentativas de verificação
     pub keystroke_rate_limit_duration: Option<u64>,  // Duração da janela de rate limiting em segundos
     pub keystroke_block_duration: Option<u64>,       // Duração do bloqueio após exceder o limite
+    
+    // Configuração para verificação por email após login
+    pub email_verification_enabled: bool,            // Habilita/desabilita verificação por email após login 📧
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -146,6 +149,12 @@ impl Config {
             keystroke_block_duration: env::var("SECURITY_BLOCK_DURATION")
                 .ok()
                 .and_then(|v| v.parse().ok()),
+                
+            // Configuração para verificação por email após login
+            email_verification_enabled: env::var("EMAIL_VERIFICATION_ENABLED")
+                .unwrap_or_else(|_| "true".to_string()) // Habilitado por padrão
+                .parse()
+                .unwrap_or(true),
         };
 
         let cors = CorsConfig {

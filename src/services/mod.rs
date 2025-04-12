@@ -5,3 +5,4 @@ pub mod two_factor_service;
 pub mod token_service;
 pub mod keystroke_service;
 pub mod keystroke_security_service;
+pub mod email_verification_service;
