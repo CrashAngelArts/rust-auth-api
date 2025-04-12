@@ -10,6 +10,7 @@ pub struct Config {
     pub email: EmailConfig,
     pub security: SecurityConfig,
     pub cors: CorsConfig,
+    pub oauth: OAuthConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -65,6 +66,41 @@ pub struct SecurityConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct CorsConfig {
     pub allowed_origins: Vec<String>,
+}
+
+// Configurações OAuth
+#[derive(Debug, Deserialize, Clone)]
+pub struct OAuthConfig {
+    pub enabled: bool,
+    pub redirect_url: String,
+    
+    // Google OAuth
+    pub google_client_id: Option<String>,
+    pub google_client_secret: Option<String>,
+    pub google_enabled: bool,
+    
+    // Facebook OAuth
+    pub facebook_client_id: Option<String>,
+    pub facebook_client_secret: Option<String>,
+    pub facebook_enabled: bool,
+    
+    // Microsoft OAuth
+    pub microsoft_client_id: Option<String>,
+    pub microsoft_client_secret: Option<String>,
+    pub microsoft_enabled: bool,
+    
+    // GitHub OAuth
+    pub github_client_id: Option<String>,
+    pub github_client_secret: Option<String>,
+    pub github_enabled: bool,
+    
+    // Apple OAuth
+    pub apple_client_id: Option<String>,
+    pub apple_client_secret: Option<String>,
+    pub apple_team_id: Option<String>,
+    pub apple_key_id: Option<String>,
+    pub apple_private_key_path: Option<String>,
+    pub apple_enabled: bool,
 }
 
 impl Config {
@@ -164,6 +200,59 @@ impl Config {
                 .map(|s| s.trim().to_string())
                 .collect(),
         };
+        
+        // Configurações OAuth
+        let oauth = OAuthConfig {
+            enabled: env::var("OAUTH_ENABLED")
+                .unwrap_or_else(|_| "false".to_string())
+                .parse()
+                .unwrap_or(false),
+            redirect_url: env::var("OAUTH_REDIRECT_URL")
+                .unwrap_or_else(|_| "http://localhost:8080/api/auth/oauth/callback".to_string()),
+                
+            // Google OAuth
+            google_client_id: env::var("GOOGLE_CLIENT_ID").ok(),
+            google_client_secret: env::var("GOOGLE_CLIENT_SECRET").ok(),
+            google_enabled: env::var("GOOGLE_OAUTH_ENABLED")
+                .unwrap_or_else(|_| "false".to_string())
+                .parse()
+                .unwrap_or(false),
+                
+            // Facebook OAuth
+            facebook_client_id: env::var("FACEBOOK_CLIENT_ID").ok(),
+            facebook_client_secret: env::var("FACEBOOK_CLIENT_SECRET").ok(),
+            facebook_enabled: env::var("FACEBOOK_OAUTH_ENABLED")
+                .unwrap_or_else(|_| "false".to_string())
+                .parse()
+                .unwrap_or(false),
+                
+            // Microsoft OAuth
+            microsoft_client_id: env::var("MICROSOFT_CLIENT_ID").ok(),
+            microsoft_client_secret: env::var("MICROSOFT_CLIENT_SECRET").ok(),
+            microsoft_enabled: env::var("MICROSOFT_OAUTH_ENABLED")
+                .unwrap_or_else(|_| "false".to_string())
+                .parse()
+                .unwrap_or(false),
+                
+            // GitHub OAuth
+            github_client_id: env::var("GITHUB_CLIENT_ID").ok(),
+            github_client_secret: env::var("GITHUB_CLIENT_SECRET").ok(),
+            github_enabled: env::var("GITHUB_OAUTH_ENABLED")
+                .unwrap_or_else(|_| "false".to_string())
+                .parse()
+                .unwrap_or(false),
+                
+            // Apple OAuth
+            apple_client_id: env::var("APPLE_CLIENT_ID").ok(),
+            apple_client_secret: env::var("APPLE_CLIENT_SECRET").ok(),
+            apple_team_id: env::var("APPLE_TEAM_ID").ok(),
+            apple_key_id: env::var("APPLE_KEY_ID").ok(),
+            apple_private_key_path: env::var("APPLE_PRIVATE_KEY_PATH").ok(),
+            apple_enabled: env::var("APPLE_OAUTH_ENABLED")
+                .unwrap_or_else(|_| "false".to_string())
+                .parse()
+                .unwrap_or(false),
+        };
 
         Ok(Config {
             server,
@@ -172,6 +261,7 @@ impl Config {
             email,
             security,
             cors,
+            oauth,
         })
     }
 }

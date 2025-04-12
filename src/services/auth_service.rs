@@ -242,7 +242,8 @@ impl AuthService {
             token_type: "Bearer".to_string(),
             expires_in: Self::parse_expiration(&config.jwt.expiration)? * 3600, // Converte horas para segundos
             refresh_token: original_refresh_token, // Retornar o token original para o cliente
-            requires_email_verification: requires_email_verification, // Indica se o login requer verificação por email 
+            requires_email_verification: requires_email_verification, // Indica se o login requer verificação por email 📫
+            user: user.clone(), // Adicionar o usuário na resposta 👤
         };
 
         info!("✅ Login bem-sucedido para o usuário: {}", user.username);
@@ -479,6 +480,7 @@ impl AuthService {
             expires_in: Self::parse_expiration(&config.jwt.expiration)? * 3600,
             refresh_token: refresh_dto.refresh_token, // Retorna o mesmo refresh token
             requires_email_verification: false, // Não requer verificação por email no refresh
+            user: user.clone(), // Adicionar o usuário na resposta 👤
         };
 
         info!("🔄 Token de acesso atualizado para o usuário: {}", user.username);
@@ -613,33 +615,45 @@ impl AuthService {
     }
 
     // Cria uma sessão
-    fn create_session(
+    pub fn create_session(
         pool: &DbPool,
-        user_id: String,
-        ip_address: Option<String>,
-        user_agent: Option<String>,
-        duration_hours: i64,
+        user_id: &str,
+        _refresh_token: &str,
+        user_agent: &str,
+        ip_address: &str,
     ) -> Result<Session, ApiError> {
         let conn = pool.get()?;
-
-        // Cria a sessão
-        let session = Session::new(user_id, ip_address, user_agent, duration_hours);
+        
+        let session = Session {
+            id: Uuid::new_v4().to_string(),
+            user_id: user_id.to_string(),
+            ip_address: ip_address.to_string(),
+            user_agent: user_agent.to_string(),
+            created_at: Utc::now(),
+            expires_at: Utc::now() + Duration::hours(24), // Sessão expira em 24 horas
+            last_activity_at: Utc::now(),
+            is_active: true,
+        };
 
         // Insere a sessão no banco de dados
         conn.execute(
-            "INSERT INTO sessions (id, user_id, token, ip_address, user_agent, expires_at, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO sessions (id, user_id, ip_address, user_agent, created_at, expires_at, last_activity_at, is_active)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             (
                 &session.id,
                 &session.user_id,
-                &session.token,
                 &session.ip_address,
                 &session.user_agent,
-                &session.expires_at,
                 &session.created_at,
+                &session.expires_at,
+                &session.last_activity_at,
+                &session.is_active,
             ),
         )?;
-
+        
+        // Associar a sessão com o refresh token (opcional)
+        // Isso pode ser feito em uma tabela separada ou adicionando uma coluna na tabela de sessões
+        
         Ok(session)
     }
 
@@ -791,5 +805,76 @@ impl AuthService {
         }
         Ok(())
     }
+    
+    // Gera tokens de autenticação para um usuário
+    pub fn generate_auth_tokens(pool: &DbPool, user: &User) -> Result<AuthResponse, ApiError> {
+        // Obtém a configuração
+        let conn = pool.get()?;
+        let config_result = conn.query_row(
+            "SELECT value FROM config WHERE key = 'jwt_secret' OR key = 'jwt_expiration' OR key = 'refresh_token_expiration'",
+            [],
+            |_| Ok(()),
+        );
+        
+        // Verifica se as configurações existem
+        if config_result.is_err() {
+            return Err(ApiError::InternalServerError("Configurações JWT não encontradas 😞".to_string()));
+        }
+        
+        // Obtém as configurações individualmente
+        let jwt_secret: String = conn.query_row(
+            "SELECT value FROM config WHERE key = 'jwt_secret'",
+            [],
+            |row| row.get(0),
+        )?;
+        
+        let jwt_expiration: String = conn.query_row(
+            "SELECT value FROM config WHERE key = 'jwt_expiration'",
+            [],
+            |row| row.get(0),
+        )?;
+        
+        let refresh_expiration: String = conn.query_row(
+            "SELECT value FROM config WHERE key = 'refresh_token_expiration'",
+            [],
+            |row| row.get(0),
+        )?;
+        
+        // Gera o token JWT
+        let access_token = Self::generate_jwt(user, &jwt_secret, &jwt_expiration)?;
+        
+        // Gera o refresh token
+        let refresh_token_value = Uuid::new_v4().to_string();
+        let token_hash = Self::hash_token(&refresh_token_value);
+        
+        // Calcula a expiração do refresh token
+        let hours = Self::parse_expiration(&refresh_expiration)?;
+        let expires_at = Utc::now() + Duration::hours(hours);
+        
+        // Cria o objeto RefreshToken
+        let refresh_token = RefreshToken {
+            id: Uuid::new_v4().to_string(),
+            user_id: user.id.clone(),
+            token_hash,
+            expires_at,
+            created_at: Utc::now(),
+            revoked: false,
+        };
+        
+        // Salva o refresh token no banco
+        Self::save_refresh_token(pool, &refresh_token)?;
+        
+        // Retorna a resposta de autenticação
+        let auth_response = AuthResponse {
+            access_token,
+            refresh_token: refresh_token_value,
+            token_type: "Bearer".to_string(),
+            expires_in: hours * 3600, // Converte horas para segundos
+            user: user.clone(),
+            requires_email_verification: false, // Por padrão não requer verificação de email 📫
+        };
+        Ok(auth_response)
+    }
+    
     // Método removido pois agora usamos a tabela recovery_emails
 } // Fecha o bloco impl AuthService

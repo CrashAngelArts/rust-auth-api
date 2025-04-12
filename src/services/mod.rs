@@ -8,3 +8,4 @@ pub mod keystroke_security_service;
 pub mod email_verification_service;
 pub mod device_service;
 pub mod recovery_email_service;
+pub mod oauth_service;

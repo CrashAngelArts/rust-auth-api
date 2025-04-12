@@ -230,8 +230,21 @@ impl DeviceService {
     ) -> Result<Session, ApiError> {
         let conn = pool.get()?;
         
-        // Criar a sessão
-        let session = Session::new(user_id.to_string(), ip_address.clone(), user_agent.clone(), duration_hours);
+        // Criar a sessão com valores padrão se não fornecidos
+        let ip = ip_address.clone().unwrap_or_else(|| "desconhecido".to_string());
+        let ua = user_agent.clone().unwrap_or_else(|| "desconhecido".to_string());
+        
+        let now = Utc::now();
+        let session = Session {
+            id: uuid::Uuid::new_v4().to_string(),
+            user_id: user_id.to_string(),
+            ip_address: ip.clone(),
+            user_agent: ua.clone(),
+            created_at: now,
+            expires_at: now + chrono::Duration::hours(duration_hours),
+            last_activity_at: now,
+            is_active: true,
+        };
         
         // Detectar tipo de dispositivo
         let device_type = Self::detect_device_type(user_agent);
@@ -251,24 +264,24 @@ impl DeviceService {
         let device_name = Self::generate_device_name(&device_type, &location);
         
         // Inserir a sessão no banco de dados com informações de dispositivo
-        let now = Utc::now().to_rfc3339();
+        let _now_str = now.to_rfc3339(); // Variável usada apenas para fins de documentação
         conn.execute(
-            "INSERT INTO sessions (id, user_id, token, ip_address, user_agent, expires_at, created_at, 
-                                  device_name, device_type, last_active_at, location, is_current)
+            "INSERT INTO sessions (id, user_id, ip_address, user_agent, expires_at, created_at, 
+                                  device_name, device_type, last_active_at, location, is_current, is_active)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             params![
                 &session.id,
                 &session.user_id,
-                &session.token,
                 &session.ip_address,
                 &session.user_agent,
                 &session.expires_at.to_rfc3339(),
                 &session.created_at.to_rfc3339(),
                 &device_name,
                 &device_type,
-                &now,
+                &session.last_activity_at.to_rfc3339(),
                 &location,
                 true, // Marcar como dispositivo atual
+                &session.is_active
             ],
         )?;
         

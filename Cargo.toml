@@ -36,6 +36,12 @@ qrcode = "0.12.0"  # Para gerar QR codes para 2FA
 base32 = "0.4.0"  # Para codificação base32 usada em 2FA
 base64 = "0.21.0"  # Para codificação base64
 
+# OAuth e autenticação social
+oauth2 = "4.4.1"  # Cliente OAuth2
+reqwest = { version = "0.11.20", features = ["json", "rustls-tls"] }  # Cliente HTTP
+url = "2.4.1"  # Manipulação de URLs
+async-trait = "0.1.73"  # Para traits assíncronas
+
 # Serialização/Deserialização
 serde = { version = "1.0.188", features = ["derive"] }
 serde_json = "1.0.107"

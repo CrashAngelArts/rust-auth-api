@@ -20,6 +20,7 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação 
 - Múltiplos emails de recuperação verificados 📧
 - Sistema de verificação de emails secundários 🔐
 - Detecção de anomalias e monitoramento de segurança 🛡️
+- Autenticação OAuth com provedores sociais 🌐
 
 ### Funcionalidades 🛠️
 - Sistema completo de autenticação
@@ -37,6 +38,7 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação 
 - Verificação por email após login com códigos de 6 dígitos 📨
 - Gerenciamento completo de dispositivos conectados (listar, visualizar, atualizar, revogar) 📱
 - Manutenção automática de tokens, códigos e sessões expiradas 🧹
+- Login com Google, Facebook, Microsoft, GitHub e Apple 🔑
 
 ## Requisitos
 
@@ -108,6 +110,38 @@ SECURITY_KEYSTROKE_THRESHOLD=70  # Limiar de similaridade (0-100)
 SECURITY_RATE_LIMIT_REQUESTS=5   # Máximo de tentativas de verificação
 SECURITY_RATE_LIMIT_DURATION=60  # Duração da janela em segundos
 SECURITY_BLOCK_DURATION=300      # Duração do bloqueio em segundos
+
+# Configurações OAuth
+OAUTH_REDIRECT_URL=http://localhost:8080/api/auth/oauth/callback
+OAUTH_ENABLED=true
+
+# Google OAuth
+GOOGLE_CLIENT_ID=seu_client_id_google
+GOOGLE_CLIENT_SECRET=seu_client_secret_google
+GOOGLE_OAUTH_ENABLED=true
+
+# Facebook OAuth
+FACEBOOK_CLIENT_ID=seu_client_id_facebook
+FACEBOOK_CLIENT_SECRET=seu_client_secret_facebook
+FACEBOOK_OAUTH_ENABLED=true
+
+# Microsoft OAuth
+MICROSOFT_CLIENT_ID=seu_client_id_microsoft
+MICROSOFT_CLIENT_SECRET=seu_client_secret_microsoft
+MICROSOFT_OAUTH_ENABLED=true
+
+# GitHub OAuth
+GITHUB_CLIENT_ID=seu_client_id_github
+GITHUB_CLIENT_SECRET=seu_client_secret_github
+GITHUB_OAUTH_ENABLED=true
+
+# Apple OAuth
+APPLE_CLIENT_ID=seu_client_id_apple
+APPLE_CLIENT_SECRET=seu_client_secret_apple
+APPLE_TEAM_ID=seu_team_id_apple
+APPLE_KEY_ID=seu_key_id_apple
+APPLE_PRIVATE_KEY_PATH=./keys/apple_private_key.p8
+APPLE_OAUTH_ENABLED=true
 ```
 
 ## Rotas da API
@@ -144,6 +178,13 @@ SECURITY_BLOCK_DURATION=300      # Duração do bloqueio em segundos
 - `POST /verify` - Verificar email de recuperação
 - `DELETE /{id}` - Remover email de recuperação
 - `POST /{id}/resend` - Reenviar email de verificação
+
+### Autenticação OAuth (`/api/auth/oauth`) 🌐
+
+- `POST /login` - Iniciar login OAuth (obter URL de autorização)
+- `GET /callback` - Callback OAuth (processar resposta do provedor)
+- `GET /connections/{user_id}` - Listar conexões OAuth do usuário
+- `DELETE /connections/{user_id}/{connection_id}` - Remover conexão OAuth
 
 ### Usuários (`/api/users`) 👤
 
@@ -339,6 +380,31 @@ O sistema agora suporta múltiplos emails de recuperação com verificação obr
 
 Esta funcionalidade melhora significativamente a segurança e a experiência do usuário, oferecendo múltiplas opções para recuperação de conta em caso de perda de acesso ao email principal. 🔐
 
+## Autenticação OAuth 🌐
+
+O sistema agora suporta autenticação via OAuth com os seguintes provedores:
+
+- Google 🔵
+- Facebook 🔷
+- Microsoft 🟦
+- GitHub 🐱
+- Apple 🍎
+
+### Funcionalidades OAuth
+
+- Login com provedores sociais populares 🔑
+- Vinculação de contas sociais a contas existentes 🔗
+- Gerenciamento de conexões OAuth (adicionar/remover) ⚙️
+- Perfil unificado com informações dos provedores 👤
+- Configuração fácil via variáveis de ambiente 💻
+
+### Endpoints OAuth
+
+- `GET /oauth/login?provider=google` - Inicia o fluxo de login OAuth
+- `GET /oauth/callback` - Callback para processamento da autenticação OAuth
+- `GET /connections/{user_id}` - Lista conexões OAuth do usuário
+- `DELETE /connections/{user_id}/{connection_id}` - Remove conexão OAuth
+
 ## Manutenção do Sistema 🧹
 
 O sistema possui rotinas de manutenção automática para:
@@ -397,7 +463,7 @@ Para reportar bugs ou solicitar novas funcionalidades, abra uma issue no reposit
 - [x] Implementar gerenciamento de dispositivos conectados
 - [x] Implementar múltiplos emails de recuperação
 - [x] Adicionar manutenção automática de sessões e tokens
-- [ ] Implementar autenticação via OAuth
+- [x] Implementar autenticação via OAuth
 - [ ] Adicionar suporte a múltiplos tenants
 - [ ] Implementar sistema de permissões granular
 - [ ] Adicionar suporte a múltiplos idiomas

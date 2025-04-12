@@ -7,3 +7,4 @@ pub mod keystroke_dynamics;
 pub mod recovery_email;
 pub mod email_verification;
 pub mod device;
+pub mod oauth;

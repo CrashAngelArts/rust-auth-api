@@ -64,7 +64,8 @@ pub struct AuthResponse {
     pub token_type: String,
     pub expires_in: i64, // Em segundos
     pub refresh_token: String, // Adicionar refresh token
-    pub requires_email_verification: bool, // Indica se o login requer verificação por email 📧
+    pub requires_email_verification: bool, // Indica se o login requer verificação por email 📫
+    pub user: crate::models::user::User, // Usuário autenticado 👤
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -135,29 +136,31 @@ impl PasswordResetToken {
 pub struct Session {
     pub id: String,
     pub user_id: String,
-    pub token: String, // Token da sessão, não JWT
-    pub ip_address: Option<String>,
-    pub user_agent: Option<String>,
+    pub ip_address: String,
+    pub user_agent: String,
     pub expires_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
+    pub last_activity_at: DateTime<Utc>,
+    pub is_active: bool,
 }
 
 impl Session {
     pub fn new(
         user_id: String,
-        ip_address: Option<String>,
-        user_agent: Option<String>,
+        ip_address: String,
+        user_agent: String,
         duration_hours: i64,
     ) -> Self {
         let now = Utc::now();
         Self {
             id: Uuid::new_v4().to_string(),
             user_id,
-            token: Uuid::new_v4().to_string(), // Token único para identificar a sessão
             ip_address,
             user_agent,
             expires_at: now + Duration::hours(duration_hours),
             created_at: now,
+            last_activity_at: now,
+            is_active: true,
         }
     }
 

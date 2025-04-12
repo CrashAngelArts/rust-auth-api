@@ -9,6 +9,7 @@ use crate::controllers::{
     email_verification_controller, // Novo controlador de verificação por email 
     device_controller, // Novo controlador de gerenciamento de dispositivos 📱
     recovery_email_controller, // Novo controlador de emails de recuperação 📧
+    oauth_controller, // Novo controlador de autenticação OAuth 🔑
 };
 use crate::middleware::{
     auth::{AdminAuth, JwtAuth},
@@ -102,6 +103,24 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
                             .wrap(jwt_auth.clone())
                             .route("/verify", web::post().to(email_verification_controller::verify_email_code))
                             .route("/resend", web::post().to(email_verification_controller::resend_verification_code)),
+                    )
+                    // Rotas para autenticação OAuth 🔑
+                    .service(
+                        web::scope("/oauth")
+                            // Iniciar login OAuth (não requer autenticação)
+                            .route("/login", web::post().to(oauth_controller::oauth_login))
+                            // Callback OAuth (não requer autenticação)
+                            .route("/callback", web::get().to(oauth_controller::oauth_callback))
+                            // Rotas que exigem autenticação JWT
+                            .service(
+                                web::scope("")
+                                    .wrap(jwt_auth.clone())
+                                    .wrap(email_verification_check.clone())
+                                    // Listar conexões OAuth do usuário
+                                    .route("/connections/{user_id}", web::get().to(oauth_controller::list_oauth_connections))
+                                    // Remover conexão OAuth
+                                    .route("/connections/{user_id}/{connection_id}", web::delete().to(oauth_controller::remove_oauth_connection)),
+                            ),
                     ),
             )
             .service(

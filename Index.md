@@ -29,6 +29,7 @@ rust-auth-api/
 │   │   ├── health_controller.rs
 │   │   ├── keystroke_controller.rs
 │   │   ├── mod.rs
+│   │   ├── oauth_controller.rs
 │   │   ├── recovery_email_controller.rs
 │   │   ├── token_controller.rs
 │   │   ├── two_factor_controller.rs
@@ -55,6 +56,7 @@ rust-auth-api/
 │   │   ├── email_verification.rs
 │   │   ├── keystroke_dynamics.rs
 │   │   ├── mod.rs
+│   │   ├── oauth.rs
 │   │   ├── recovery_email.rs
 │   │   ├── response.rs
 │   │   ├── token.rs
@@ -70,6 +72,7 @@ rust-auth-api/
 │   │   ├── keystroke_security_service.rs
 │   │   ├── keystroke_service.rs
 │   │   ├── mod.rs
+│   │   ├── oauth_service.rs
 │   │   ├── recovery_email_service.rs
 │   │   ├── token_service.rs
 │   │   ├── two_factor_service.rs
@@ -107,6 +110,7 @@ Gerencia a configuração da aplicação carregada de variáveis de ambiente.
 - `EmailConfig`: Configuração do serviço de email
 - `SecurityConfig`: Configurações de segurança como hash de senha e rate limiting
 - `CorsConfig`: Configuração da política CORS
+- `OAuthConfig`: Configurações para autenticação OAuth com provedores sociais
 
 **Functions:**
 - `Config::from_env()`: Carrega configuração de variáveis de ambiente
@@ -188,7 +192,7 @@ Lida com requisições HTTP relacionadas aos usuários.
 **Functions:**
 - `list_users()`: Lista todos os usuários (somente admin)
 - `get_user()`: Obtém um usuário específico por ID
-- `update_user()`: Atualiza informações de um usuário
+- `update_user()`: Atualiza as informações de um usuário
 - `delete_user()`: Exclui um usuário (somente admin)
 - `change_password()`: Altera a senha de um usuário
 
@@ -198,6 +202,16 @@ Lida com endpoints de verificação de saúde.
 **Functions:**
 - `health_check()`: Retorna o status de saúde da API
 - `version()`: Retorna as informações de versão da API
+
+#### oauth_controller.rs
+Lida com requisições HTTP relacionadas à autenticação OAuth com provedores sociais 🌐
+
+**Functions:**
+- `oauth_login()`: Inicia o fluxo de login OAuth redirecionando para o provedor
+- `oauth_callback()`: Processa o retorno do provedor OAuth e autentica o usuário
+- `list_oauth_connections()`: Lista todas as conexões OAuth de um usuário
+- `remove_oauth_connection()`: Remove uma conexão OAuth específica
+- `clean_expired_tokens()`: Limpa tokens expirados da lista negra
 
 ### Models Module (`src/models/`) 📋
 
@@ -242,9 +256,9 @@ Define estruturas de dados relacionadas ao usuário.
 
 **Structs:**
 - `User`: Entidade principal do usuário com todos os dados
-- `CreateUserDto`: Objeto de transferência de dados para criação de usuário
-- `UpdateUserDto`: Objeto de transferência de dados para atualizações de usuário
-- `ChangePasswordDto`: Objeto de transferência de dados para alterações de senha
+- `CreateUserDto`: DTO para criação de usuário
+- `UpdateUserDto`: DTO para atualização de usuário
+- `ChangePasswordDto`: DTO para alteração de senha
 - `UserResponse`: Dados do usuário seguros para respostas da API (exclui dados sensíveis)
 
 **Methods:**
@@ -258,9 +272,9 @@ Define estruturas de dados para autenticação de dois fatores.
 **Structs:**
 - `TwoFactorSetupResponse`: Resposta de configuração 2FA com QR code
 - `TwoFactorEnabledResponse`: Resposta de ativação 2FA com códigos de backup
-- `Enable2FADto`: Objeto para ativar 2FA
-- `Verify2FADto`: Objeto para verificar código TOTP
-- `Disable2FADto`: Objeto para desativar 2FA
+- `Enable2FADto`: DTO para ativar 2FA
+- `Verify2FADto`: DTO para verificar código TOTP
+- `Disable2FADto`: DTO para desativar 2FA
 
 #### token.rs
 Define estruturas de dados para rotação de tokens JWT.
@@ -268,15 +282,15 @@ Define estruturas de dados para rotação de tokens JWT.
 **Structs:**
 - `TokenClaims`: Claims do token JWT com suporte a família de tokens
 - `BlacklistedToken`: Token na lista negra
-- `RefreshTokenDto`: Objeto para atualização de token
+- `RefreshTokenDto`: DTO para atualização de token
 
 #### keystroke_dynamics.rs
 Define estruturas de dados para análise de ritmo de digitação.
 
 **Structs:**
 - `KeystrokeDynamics`: Modelo para armazenar padrões de digitação
-- `RegisterKeystrokePatternDto`: Objeto para registrar padrões
-- `VerifyKeystrokePatternDto`: Objeto para verificar padrões
+- `RegisterKeystrokePatternDto`: DTO para registrar padrões
+- `VerifyKeystrokePatternDto`: DTO para verificar padrões
 - `KeystrokeVerificationResponse`: Resposta de verificação com similaridade
 - `KeystrokeStatusResponse`: Status da verificação de ritmo de digitação
 
@@ -284,12 +298,12 @@ Define estruturas de dados para análise de ritmo de digitação.
 Define estruturas de dados relacionadas à autenticação.
 
 **Structs:**
-- `LoginDto`: Objeto de transferência de dados para login
-- `RegisterDto`: Objeto de transferência de dados para registro
-- `RefreshTokenDto`: Objeto de transferência de dados para atualização de token
-- `ForgotPasswordDto`: Objeto de transferência de dados para recuperação de senha
-- `ResetPasswordDto`: Objeto de transferência de dados para redefinição de senha
-- `UnlockAccountDto`: Objeto de transferência de dados para desbloqueio de conta
+- `LoginDto`: DTO para login
+- `RegisterDto`: DTO para registro
+- `RefreshTokenDto`: DTO para atualização de token
+- `ForgotPasswordDto`: DTO para recuperação de senha
+- `ResetPasswordDto`: DTO para redefinição de senha
+- `UnlockAccountDto`: DTO para desbloqueio de conta
 - `TokenClaims`: Claims do token JWT
 - `AuthResponse`: Resposta de autenticação com tokens
 - `Session`: Informações de sessão do usuário
@@ -302,6 +316,16 @@ Define estruturas de resposta da API.
 
 **Structs:**
 - `ApiResponse<T>`: Wrapper genérico de resposta da API
+
+#### oauth.rs
+Define estruturas de dados para autenticação OAuth.
+
+**Structs:**
+- `OAuthProvider`: Enum dos provedores suportados (Google, Facebook, Microsoft, GitHub, Apple)
+- `OAuthConnection`: Modelo para armazenar conexões OAuth do usuário
+- `OAuthUserProfile`: Perfil de usuário obtido do provedor OAuth
+- `OAuthLoginRequest`: Requisição para iniciar login OAuth
+- `OAuthCallbackRequest`: Dados recebidos no callback OAuth
 
 ### Services Module (`src/services/`)
 
@@ -385,7 +409,7 @@ Implementa a lógica de negócios para gerenciamento de usuários.
 - `get_user_by_username()`: Obtém um usuário por nome de usuário
 - `get_user_by_email_or_username()`: Obtém um usuário por email ou nome de usuário
 - `update_user()`: Atualiza as informações de um usuário
-- `delete_user()`: Exclui um usuário
+- `delete_user()`: Exclui um usuário (somente admin)
 - `change_password()`: Altera a senha de um usuário
 - `hash_password()`: Gera hash de uma senha
 - `verify_password()`: Verifica uma senha contra seu hash
@@ -394,7 +418,7 @@ Implementa a lógica de negócios para gerenciamento de usuários.
 #### keystroke_service.rs
 Implementa a lógica de negócios para análise de ritmo de digitação.
 
-**Funções:**
+**Functions:**
 - `register_pattern()`: Registra um novo padrão de digitação
 - `verify_keystroke_pattern()`: Verifica um padrão durante o login
 - `toggle_keystroke_verification()`: Habilita/desabilita verificação
@@ -407,7 +431,7 @@ Implementa monitoramento de segurança e detecção de anomalias para keystroke 
 **Struct:**
 - `KeystrokeSecurityService`: Serviço para monitorar tentativas de verificação de keystroke
 
-**Métodos:**
+**Methods:**
 - `record_verification_attempt()`: Registra e analisa tentativas de verificação
 - `check_for_suspicious_patterns()`: Detecta anomalias em padrões de digitação
 - `check_consecutive_failures()`: Monitora ataques de força bruta
@@ -437,6 +461,22 @@ Implementa a lógica de negócios para autenticação de dois fatores.
 - `generate_backup_codes()`: Gera códigos de backup para recuperação
 - `verify_backup_code()`: Verifica um código de backup
 - `get_2fa_status()`: Obtém o status atual do 2FA
+
+#### oauth_service.rs
+Implementa a lógica de negócios para autenticação OAuth com provedores sociais.
+
+**Functions:**
+- `get_authorization_url()`: Gera URL para redirecionamento ao provedor OAuth
+- `process_callback()`: Processa o retorno do provedor OAuth
+- `get_user_profile()`: Obtém o perfil do usuário do provedor OAuth
+- `process_oauth_login()`: Processa o login OAuth e cria/atualiza o usuário
+- `list_oauth_connections()`: Lista conexões OAuth de um usuário
+- `remove_oauth_connection()`: Remove uma conexão OAuth
+- `validate_token()`: Valida um token JWT
+- `generate_jwt()`: Gera um token JWT
+- `create_session()`: Cria uma nova sessão de usuário
+- `log_auth_event()`: Registra eventos de autenticação
+- `parse_expiration()`: Analisa o tempo de expiração do token
 
 ### Middleware Module (`src/middleware/`)
 
@@ -512,16 +552,22 @@ Configura rotas da API e middleware.
 **Functions:**
 - `configure_routes()`: Configura todas as rotas da API com seus respectivos middlewares
 
-## API Endpoints
+## API Endpoints 🛣️
 
 ### Authentication Endpoints 🔑
-- `POST /api/auth/register`: Registrar um novo usuário
-- `POST /api/auth/login`: Autenticar um usuário
-- `POST /api/auth/forgot-password`: Solicitar redefinição de senha
-- `POST /api/auth/reset-password`: Redefinir senha com token
-- `POST /api/auth/unlock`: Desbloquear uma conta bloqueada
-- `POST /api/auth/refresh`: Atualizar token de acesso
-- `GET /api/auth/me`: Obter informações do usuário atual (requer autenticação)
+- `POST /api/auth/register`: Registrar novo usuário
+- `POST /api/auth/login`: Autenticar usuário
+- `POST /api/auth/forgot-password`: Solicitar recuperação de senha
+- `POST /api/auth/reset-password`: Redefinir senha
+- `POST /api/auth/refresh`: Atualizar token JWT
+- `POST /api/auth/unlock`: Desbloquear conta
+- `GET /api/auth/me`: Obter perfil do usuário atual
+
+### OAuth Endpoints 🌐
+- `GET /api/auth/oauth/login?provider=google`: Iniciar login OAuth
+- `GET /api/auth/oauth/callback`: Callback para processamento OAuth
+- `GET /api/auth/oauth/connections/{user_id}`: Listar conexões OAuth
+- `DELETE /api/auth/oauth/connections/{user_id}/{connection_id}`: Remover conexão OAuth (requer autenticação)
 - `POST /api/auth/token/rotate`: Rotacionar token JWT
 - `POST /api/auth/token/revoke`: Revogar token JWT
 - `POST /api/auth/revoke-all/{id}`: Revogar todos os tokens (logout de todos os dispositivos)
@@ -593,4 +639,5 @@ Configura rotas da API e middleware.
 17. **Verificação por Email após Login**: Verificação adicional de segurança com código enviado por email após login 📧
 18. **Gerenciamento de Dispositivos**: Controle completo sobre dispositivos conectados 📱
 19. **Múltiplos Emails de Recuperação**: Suporte para cadastrar e verificar múltiplos emails de recuperação 📧
+20. **OAuth Authentication**: Autenticação via provedores sociais (Google, Facebook, Microsoft, GitHub, Apple) 🌐
 </rewritten_file> 
