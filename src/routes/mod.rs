@@ -37,8 +37,8 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
     let error_handler = ErrorHandler::new();
     let request_logger = RequestLogger::new();
     let rate_limiter = RateLimiter::new(
-        config.security.rate_limit_requests,
-        config.security.rate_limit_duration,
+        config.security.rate_limit_capacity,
+        config.security.rate_limit_refill_rate,
     );
     let email_verification_check = EmailVerificationCheck::new(); // Middleware de verificação por email 📧
     let csrf_protect = CsrfProtect::from_config(config); // <-- Instanciado middleware CSRF 🛡️🍪

@@ -43,6 +43,7 @@ rust-auth-api/
 │   ├── middleware/
 │   │   ├── auth.rs
 │   │   ├── cors.rs
+│   │   ├── csrf.rs
 │   │   ├── email_verification.rs
 │   │   ├── error.rs
 │   │   ├── keystroke_rate_limiter.rs
@@ -108,7 +109,14 @@ Gerencia a configuração da aplicação carregada de variáveis de ambiente.
 - `DatabaseConfig`: Configurações de conexão com banco de dados
 - `JwtConfig`: Configurações de autenticação JWT
 - `EmailConfig`: Configuração do serviço de email
-- `SecurityConfig`: Configurações de segurança como hash de senha e rate limiting
+- `SecurityConfig`: Configurações de segurança como hash de senha, rate limiting e CSRF.
+    - `password_salt_rounds`: Rounds para hash de senha.
+    - `rate_limit_capacity`: Capacidade do Token Bucket para rate limiting global.
+    - `rate_limit_refill_rate`: Taxa de recarga (tokens/seg) do Token Bucket global.
+    - `max_login_attempts`, `lockout_duration_seconds`, `unlock_token_duration_minutes`: Configs. de bloqueio de conta.
+    - `keystroke_...`: Configs. para keystroke dynamics.
+    - `email_verification_enabled`: Flag para verificação de email pós-login.
+    - `csrf_secret`: Segredo para proteção CSRF.
 - `CorsConfig`: Configuração da política CORS
 - `OAuthConfig`: Configurações para autenticação OAuth com provedores sociais
 
@@ -241,15 +249,29 @@ Define estruturas de dados para verificação por email após login.
 Define estruturas de dados para emails de recuperação secundários.
 
 **Structs:**
-- `RecoveryEmail`: Modelo para email de recuperação
-- `RecoveryEmailResponse`: Resposta da API com informações do email de recuperação
-- `AddRecoveryEmailDto`: DTO para adicionar um novo email de recuperação
+- `RecoveryEmail`: Modelo para armazenar emails de recuperação
+- `RecoveryEmailDto`: DTO para adicionar um email de recuperação
 - `VerifyRecoveryEmailDto`: DTO para verificar um email de recuperação
+- `RecoveryEmailResponse`: Resposta da API com informações do email
 
-**Methods:**
-- `RecoveryEmail::new()`: Cria um novo email de recuperação
-- `RecoveryEmail::is_verified()`: Verifica se o email foi verificado
-- `RecoveryEmail::generate_verification_code()`: Gera código de verificação
+#### permission.rs
+Define estruturas de dados para permissões do RBAC.
+
+**Structs:**
+- `Permission`: Representa uma permissão no sistema.
+- `CreatePermissionDto`: DTO para criar uma nova permissão.
+- `UpdatePermissionDto`: DTO para atualizar uma permissão existente.
+
+#### role.rs - *TODO*
+Define estruturas de dados para papéis (roles) do RBAC.
+
+**Structs:**
+- `Role`: Representa um papel no sistema. (*TODO*)
+- `CreateRoleDto`: DTO para criar um novo papel. (*TODO*)
+- `UpdateRoleDto`: DTO para atualizar um papel existente. (*TODO*)
+
+#### association.rs - *TODO*
+Define estruturas de dados para associações entre usuários, papéis e permissões. (*TODO*)
 
 #### user.rs
 Define estruturas de dados relacionadas ao usuário.
@@ -451,16 +473,44 @@ Implementa a lógica de negócios para gerenciamento de tokens JWT.
 - `update_token_family()`: Atualiza a família de tokens de um usuário
 
 #### two_factor_service.rs
-Implementa a lógica de negócios para autenticação de dois fatores.
+Gerencia a lógica de autenticação de dois fatores.
 
 **Functions:**
-- `setup_2fa()`: Configura 2FA para um usuário e gera QR code
-- `enable_2fa()`: Ativa 2FA após verificar código TOTP
-- `disable_2fa()`: Desativa 2FA após verificação
-- `verify_totp_code()`: Verifica um código TOTP
-- `generate_backup_codes()`: Gera códigos de backup para recuperação
-- `verify_backup_code()`: Verifica um código de backup
-- `get_2fa_status()`: Obtém o status atual do 2FA
+- `generate_2fa_secret()`: Gera segredo TOTP
+- `verify_totp_code()`: Verifica código TOTP
+- `generate_backup_codes()`: Gera códigos de backup
+- `verify_backup_code()`: Verifica código de backup
+
+#### rbac_service.rs
+Gerencia a lógica do Controle de Acesso Baseado em Papéis (RBAC).
+
+**Structs:**
+- `RbacService`: Serviço principal para operações RBAC.
+
+**Funções (Permissões):**
+- `create_permission()`: Cria uma nova permissão.
+- `get_permission_by_id()`: Busca uma permissão pelo ID.
+- `get_permission_by_name()`: Busca uma permissão pelo nome.
+- `list_permissions()`: Lista todas as permissões.
+- `update_permission()`: Atualiza uma permissão existente.
+- `delete_permission()`: Deleta uma permissão.
+
+**Funções (Papéis):** (*TODO*)
+- `create_role()`
+- `get_role_by_id()`
+- `get_role_by_name()`
+- `list_roles()`
+- `update_role()`
+- `delete_role()`
+
+**Funções (Associações):** (*TODO*)
+- `assign_permission_to_role()`
+- `revoke_permission_from_role()`
+- `assign_role_to_user()`
+- `revoke_role_from_user()`
+- `get_user_roles()`
+- `get_role_permissions()`
+- `check_user_permission()`
 
 #### oauth_service.rs
 Implementa a lógica de negócios para autenticação OAuth com provedores sociais.
@@ -479,6 +529,13 @@ Implementa a lógica de negócios para autenticação OAuth com provedores socia
 - `parse_expiration()`: Analisa o tempo de expiração do token
 
 ### Middleware Module (`src/middleware/`) 
+
+#### csrf.rs
+Implementa middleware para proteção contra ataques CSRF (Cross-Site Request Forgery) usando a estratégia Double Submit Cookie. Requer que requisições inseguras enviem um token correspondente no header `X-CSRF-Token` e no cookie `csrf_token`.
+
+**Structs:**
+- `CsrfProtect`: Transform (fábrica) para o middleware.
+- `CsrfProtectMiddleware`: O middleware de serviço real.
 
 #### email_verification.rs
 Implementa middleware para verificação por email após login.
@@ -519,16 +576,16 @@ Registra requisições e respostas HTTP.
 - `RequestLogger`: Middleware para registro de requisições
 
 #### rate_limiter.rs
-Implementa limitação de taxa para prevenir abusos.
+Implementa limitação de taxa global usando o algoritmo **Token Bucket** para prevenir abusos e suavizar rajadas de requisições.
 
 **Struct:**
-- `RateLimiter`: Middleware para limitação de taxa de requisições
+- `RateLimiter`: Middleware (Transform e Service) para limitação de taxa baseado em IP.
 
 **Methods:**
-- `RateLimiter::new()`: Cria um novo limitador de taxa com limites especificados
+- `RateLimiter::new(capacity: u32, refill_rate: f64)`: Cria um novo limitador de taxa com a capacidade do balde e a taxa de recarga (tokens/segundo).
 
 #### keystroke_rate_limiter.rs
-Implementa limitação de taxa especializada para verificação de ritmo de digitação.
+Implementa limitação de taxa especializada (Fixed Window Counter) para verificação de ritmo de digitação.
 
 **Struct:**
 - `KeystrokeRateLimiter`: Middleware para limitação de taxa de tentativas de verificação de keystroke
@@ -547,7 +604,7 @@ Implementa configurações de segurança para a API.
 ### Routes Module (`src/routes/`) 
 
 #### mod.rs
-Configura rotas da API e middleware.
+Configura rotas da API e middleware (incluindo CSRF e Rate Limiter).
 
 **Functions:**
 - `configure_routes()`: Configura todas as rotas da API com seus respectivos middlewares
@@ -622,7 +679,7 @@ Configura rotas da API e middleware.
 
 1. **JWT Authentication**: Autenticação segura baseada em tokens
 2. **Password Hashing**: Armazenamento seguro de senhas com bcrypt e Argon2
-3. **Rate Limiting**: Proteção contra ataques de força bruta
+3. **Rate Limiting (Token Bucket)**: Proteção contra ataques de força bruta e suavização de rajadas, usando algoritmo Token Bucket configurável (capacidade e taxa de recarga). 🚦
 4. **Account Locking**: Bloqueio automático de conta após tentativas de login malsucedidas
 5. **CORS Protection**: Política de compartilhamento de recursos entre origens configurável
 6. **Refresh Tokens**: Mecanismo seguro de atualização de tokens
@@ -631,16 +688,17 @@ Configura rotas da API e middleware.
 9. **Two-Factor Authentication (2FA)**: Autenticação de dois fatores com TOTP e códigos de backup
 10. **Token Rotation**: Rotação de tokens JWT com invalidação baseada em família
 11. **Token Blacklist**: Lista negra de tokens para revogação imediata
-12. **Keystroke Dynamics**: Análise de ritmo de digitação para verificação biométrica comportamental
-13. **Rate Limiting para Keystroke**: Limitação de taxa específica para tentativas de verificação de keystroke
-14. **Detecção de Anomalias**: Identificação de padrões anômalos em tentativas de verificação
-15. **Proteção contra Força Bruta**: Mecanismos avançados para prevenir ataques de força bruta
-16. **Monitoramento de Segurança**: Monitoramento contínuo de atividades suspeitas
-17. **Verificação por Email após Login**: Verificação adicional de segurança com código enviado por email após login 
-18. **Gerenciamento de Dispositivos**: Controle completo sobre dispositivos conectados 
-19. **Múltiplos Emails de Recuperação**: Suporte para cadastrar e verificar múltiplos emails de recuperação 
-20. **OAuth Authentication**: Autenticação via provedores sociais (Google, Facebook, Microsoft, GitHub, Apple) 
-21. **Token Validation Caching**: Cache em memória (Moka) para resultados de validação de token JWT, acelerando requisições subsequentes com o mesmo token. 
+12. **Proteção CSRF (Double Submit Cookie)**: Proteção contra Cross-Site Request Forgery usando tokens sincronizados em cookie e header. 🛡️🍪
+13. **Keystroke Dynamics**: Análise de ritmo de digitação para verificação biométrica comportamental
+14. **Rate Limiting para Keystroke**: Limitação de taxa específica para tentativas de verificação de keystroke
+15. **Detecção de Anomalias**: Identificação de padrões anômalos em tentativas de verificação
+16. **Proteção contra Força Bruta**: Mecanismos avançados para prevenir ataques de força bruta
+17. **Monitoramento de Segurança**: Monitoramento contínuo de atividades suspeitas
+18. **Verificação por Email após Login**: Verificação adicional de segurança com código enviado por email após login 
+19. **Gerenciamento de Dispositivos**: Controle completo sobre dispositivos conectados 
+20. **Múltiplos Emails de Recuperação**: Suporte para cadastrar e verificar múltiplos emails de recuperação 
+21. **OAuth Authentication**: Autenticação via provedores sociais (Google, Facebook, Microsoft, GitHub, Apple) 
+22. **Token Validation Caching**: Cache em memória (Moka) para resultados de validação de token JWT, acelerando requisições subsequentes com o mesmo token. 
 
 ---
 *Este índice foi gerado automaticamente e pode ser atualizado conforme o projeto evolui.*

@@ -75,7 +75,7 @@ impl UserService {
 
         // Insere o usuário no banco de dados (incluindo valores padrão para novos campos)
         conn.execute(
-            "INSERT INTO users (id, email, username, password_hash, first_name, last_name, is_active, is_admin, created_at, updated_at, failed_login_attempts, locked_until, unlock_token, unlock_token_expires_at, recovery_email)
+            "INSERT INTO users (id, email, username, password_hash, first_name, last_name, is_active, created_at, updated_at, failed_login_attempts, locked_until, unlock_token, unlock_token_expires_at, recovery_email)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
             (
                 &user.id,
@@ -85,7 +85,6 @@ impl UserService {
                 &user.first_name,
                 &user.last_name,
                 &user.is_active,
-                &user.is_admin,
                 &user.created_at,
                 &user.updated_at,
                 &user.failed_login_attempts, // 0
@@ -128,6 +127,7 @@ impl UserService {
                     backup_codes: row.get(16)?,         // Campo para 2FA
                     token_family: row.get(17)?,         // Campo para rotação de tokens
                     recovery_email: row.get(18)?,       // Campo para email de recuperação 📧
+                    roles: Vec::new(),
                 })
             },
         ).map_err(|e| match e {
@@ -166,6 +166,7 @@ impl UserService {
                     backup_codes: row.get(16)?,         // Campo para 2FA
                     token_family: row.get(17)?,         // Campo para rotação de tokens
                     recovery_email: row.get(18)?,       // Campo para recuperação de senha
+                    roles: Vec::new(),
                 })
             },
         ).map_err(|e| match e {
@@ -204,6 +205,7 @@ impl UserService {
                     backup_codes: row.get(16)?,         // Campo para 2FA
                     token_family: row.get(17)?,         // Campo para rotação de tokens
                     recovery_email: row.get(18)?,       // Campo para recuperação de senha
+                    roles: Vec::new(),
                 })
             },
         ).map_err(|e| match e {
@@ -230,7 +232,7 @@ impl UserService {
 
         // Obtém os usuários paginados
         let mut stmt = conn.prepare(
-            "SELECT id, email, username, first_name, last_name, is_active, is_admin, created_at, recovery_email
+            "SELECT id, email, username, first_name, last_name, is_active, is_admin, created_at, recovery_email, updated_at
              FROM users
              ORDER BY created_at DESC
              LIMIT ?1 OFFSET ?2",
@@ -243,10 +245,12 @@ impl UserService {
                 username: row.get(2)?,
                 first_name: row.get(3)?,
                 last_name: row.get(4)?,
-                recovery_email: row.get(8)?,
                 is_active: row.get(5)?,
                 is_admin: row.get(6)?,
                 created_at: row.get(7)?,
+                recovery_email: row.get(8)?,
+                updated_at: row.get(9)?,
+                roles: None,
             })
         })?;
 

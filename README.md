@@ -8,7 +8,8 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação 
 - Autenticação JWT com rotação de tokens
 - Hash de senhas com bcrypt e Argon2
 - Validação de entrada estrita
-- Rate limiting
+- Rate limiting (algoritmo Token Bucket configurável) 🚦
+- Proteção CSRF (Double Submit Cookie) 🛡️🍪
 - CORS configurável
 - Logging detalhado
 - Autenticação de dois fatores (2FA)
@@ -22,6 +23,7 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação 
 - Detecção de anomalias e monitoramento de segurança 🛡️
 - Autenticação OAuth com provedores sociais 🌐
 - Cache de validação de token JWT (Moka) para otimizar performance ⚡
+- RBAC (Role-Based Access Control) para gerenciamento fino de permissões 🎭
 
 ### Funcionalidades 🛠️
 - Sistema completo de autenticação
@@ -40,6 +42,7 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação 
 - Gerenciamento completo de dispositivos conectados (listar, visualizar, atualizar, revogar) 📱
 - Manutenção automática de tokens, códigos e sessões expiradas 🧹
 - Login com Google, Facebook, Microsoft, GitHub e Apple 🔑
+- Gerenciamento básico de Permissões (CRUD) via serviço RBAC 📄
 
 ## Requisitos
 
@@ -75,74 +78,62 @@ As configurações podem ser definidas através do arquivo `.env`:
 # Servidor
 SERVER_HOST=127.0.0.1
 SERVER_PORT=8080
-LOG_LEVEL=info
+LOG_LEVEL=info # ou debug, trace para mais detalhes
 
 # Banco de Dados
 DATABASE_URL=./data/auth.db
 
 # JWT
-JWT_SECRET=sua_chave_secreta_aqui
-JWT_EXPIRATION=24h
-JWT_FAMILY_ENABLED=true
-JWT_BLACKLIST_ENABLED=true
+JWT_SECRET=seu_segredo_jwt_forte_e_aleatorio_aqui
+JWT_EXPIRATION=15m # Expiração curta para access tokens (ex: 15 minutos)
+JWT_REFRESH_EXPIRATION_DAYS=7 # Expiração do refresh token em dias
 
-# Email
-EMAIL_SMTP_SERVER=smtp.gmail.com
-EMAIL_SMTP_PORT=587
-EMAIL_USERNAME=seu_email@gmail.com
-EMAIL_PASSWORD=sua_senha
-EMAIL_FROM=seu_email@gmail.com
-EMAIL_FROM_NAME="Nome do Sistema"
-EMAIL_BASE_URL=http://localhost:8080
+# Email (Opcional, defina EMAIL_ENABLED=false para desabilitar)
 EMAIL_ENABLED=true
-EMAIL_VERIFICATION_ENABLED=true
+EMAIL_SMTP_SERVER=smtp.example.com
+EMAIL_SMTP_PORT=587
+EMAIL_USERNAME=seu_email@example.com
+EMAIL_PASSWORD=sua_senha_email_ou_app_password
+EMAIL_FROM=noreply@example.com
+EMAIL_FROM_NAME="Nome da Sua Aplicação"
+EMAIL_BASE_URL=http://localhost:8080 # URL base para links nos emails
+EMAIL_VERIFICATION_ENABLED=true # Habilita verificação por email após login
 
 # Segurança
-SECURITY_SALT_ROUNDS=10
-SECURITY_RATE_LIMIT_REQUESTS=100
-SECURITY_RATE_LIMIT_DURATION=1h
-SECURITY_2FA_ENABLED=true
-SECURITY_2FA_ISSUER="Sua Empresa"
-SECURITY_KEYSTROKE_ENABLED=true
-SECURITY_KEYSTROKE_THRESHOLD=70
+PASSWORD_SALT_ROUNDS=10 # Custo do Bcrypt (ou ignorado se USE_ARGON2=true)
+# USE_ARGON2=true # Descomente para usar Argon2id em vez de Bcrypt (recomendado)
 
-# Segurança de Keystroke Dynamics
+# Rate Limiting (Token Bucket)
+RATE_LIMIT_CAPACITY=100       # Capacidade do balde (burst)
+RATE_LIMIT_REFILL_RATE=10.0   # Taxa de recarga (tokens/segundo)
+
+# CSRF Protection
+CSRF_SECRET=seu_segredo_csrf_forte_e_aleatorio_aqui_32_bytes
+
+# Keystroke Dynamics (Opcional)
 SECURITY_KEYSTROKE_THRESHOLD=70  # Limiar de similaridade (0-100)
-SECURITY_RATE_LIMIT_REQUESTS=5   # Máximo de tentativas de verificação
-SECURITY_RATE_LIMIT_DURATION=60  # Duração da janela em segundos
-SECURITY_BLOCK_DURATION=300      # Duração do bloqueio em segundos
+SECURITY_RATE_LIMIT_REQUESTS=5   # Tentativas de verificação / período
+SECURITY_RATE_LIMIT_DURATION=60  # Período de rate limit (segundos)
+SECURITY_BLOCK_DURATION=300      # Duração do bloqueio (segundos)
 
-# Configurações OAuth
-OAUTH_REDIRECT_URL=http://localhost:8080/api/auth/oauth/callback
+# OAuth (Opcional, defina OAUTH_ENABLED=false para desabilitar)
 OAUTH_ENABLED=true
+OAUTH_REDIRECT_URL=http://localhost:8080/api/auth/oauth/callback
 
-# Google OAuth
-GOOGLE_CLIENT_ID=seu_client_id_google
-GOOGLE_CLIENT_SECRET=seu_client_secret_google
+# Google OAuth (Exemplo)
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
 GOOGLE_OAUTH_ENABLED=true
 
-# Facebook OAuth
-FACEBOOK_CLIENT_ID=seu_client_id_facebook
-FACEBOOK_CLIENT_SECRET=seu_client_secret_facebook
-FACEBOOK_OAUTH_ENABLED=true
+# ... outras configurações OAuth (Facebook, Microsoft, GitHub, Apple) ...
 
-# Microsoft OAuth
-MICROSOFT_CLIENT_ID=seu_client_id_microsoft
-MICROSOFT_CLIENT_SECRET=seu_client_secret_microsoft
-MICROSOFT_OAUTH_ENABLED=true
+# CORS
+CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080 # Origens permitidas (separadas por vírgula)
 
-# GitHub OAuth
-GITHUB_CLIENT_ID=seu_client_id_github
-GITHUB_CLIENT_SECRET=seu_client_secret_github
-GITHUB_OAUTH_ENABLED=true
-
-# Apple OAuth
-APPLE_CLIENT_ID=seu_client_id_apple
-APPLE_CLIENT_SECRET=seu_client_secret_apple
-APPLE_TEAM_ID=seu_team_id_apple
-APPLE_KEY_ID=seu_key_id_apple
-APPLE_PRIVATE_KEY_PATH=./keys/apple_private_key.p8
-APPLE_OAUTH_ENABLED=true
+# Admin Padrão (Primeira execução)
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=Admin@123
+ADMIN_NAME=Administrador
 ```
 
 ## Rotas da API
@@ -221,6 +212,20 @@ APPLE_OAUTH_ENABLED=true
 - `POST /clean-verification-codes` - Limpar códigos de verificação expirados
 - `POST /clean-sessions` - Limpar sessões expiradas
 
+### RBAC (Controle de Acesso Baseado em Papéis) (`/api/rbac`) 🎭
+
+#### Permissões (`/permissions`)
+- `POST /` - Criar nova permissão (requer privilégios)
+- `GET /` - Listar todas as permissões
+- `GET /{id}` - Obter detalhes de uma permissão
+- `GET /by-name/{name}` - Obter detalhes de uma permissão pelo nome
+- `PUT /{id}` - Atualizar uma permissão (requer privilégios)
+- `DELETE /{id}` - Deletar uma permissão (requer privilégios)
+
+#### Papéis (`/roles`) - *TODO*
+
+#### Associações (`/associations`) - *TODO*
+
 ### Rota Raiz
 
 - `GET /` - Mensagem de boas-vindas e página de documentação da API
@@ -229,7 +234,8 @@ APPLE_OAUTH_ENABLED=true
 
 - JWT Authentication
 - Admin Authorization
-- Rate Limiter
+- Rate Limiter (Token Bucket) 🚦
+- CSRF Protection (Double Submit Cookie) 🛡️🍪
 - Request Logger
 - Error Handler
 - CORS
@@ -335,9 +341,10 @@ APPLE_OAUTH_ENABLED=true
 
 ## Segurança 🛡️
 
-- Senhas são armazenadas com hash bcrypt ou Argon2
+- Senhas são armazenadas com hash bcrypt ou Argon2 (configurável)
 - Tokens JWT com expiração configurável e rotação de família
-- Rate limiting para prevenir brute force
+- Rate limiting global com algoritmo **Token Bucket** para suavizar rajadas e limitar taxa média 🚦
+- Proteção contra **CSRF** usando Double Submit Cookie 🛡️🍪
 - Sistema de bloqueio de contas após tentativas inválidas
 - Validação de entrada rigorosa
 - Proteção contra CORS malicioso

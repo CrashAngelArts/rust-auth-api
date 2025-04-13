@@ -8,3 +8,5 @@ pub mod recovery_email;
 pub mod email_verification;
 pub mod device;
 pub mod oauth;
+pub mod role;
+pub mod permission;

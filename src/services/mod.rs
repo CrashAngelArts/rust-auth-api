@@ -9,3 +9,4 @@ pub mod email_verification_service;
 pub mod device_service;
 pub mod recovery_email_service;
 pub mod oauth_service;
+pub mod rbac_service;

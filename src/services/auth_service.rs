@@ -519,6 +519,7 @@ impl AuthService {
                     backup_codes: row.get(16)?,         // Campo para 2FA
                     token_family: row.get(17)?,         // Campo para rotação de tokens
                     recovery_email: row.get(18)?,       // Campo para email de recuperação
+                    roles: Vec::new(), // <-- Adicionado: Inicializar roles como vazio
                 })
             },
         );

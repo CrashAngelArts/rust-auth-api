@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
+use super::role::Role;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct User {
@@ -34,6 +35,8 @@ pub struct User {
     // Campo para rotação de tokens JWT
     #[serde(skip_serializing)] // Não expor a família de tokens
     pub token_family: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub roles: Vec<Role>,
 }
 
 impl User {
@@ -65,6 +68,7 @@ impl User {
             totp_enabled: false,      // 2FA desabilitado por padrão
             backup_codes: None,       // Inicializa sem códigos de backup
             token_family: Some(Uuid::new_v4().to_string()), // Cria uma nova família de tokens
+            roles: Vec::new(),
         }
     }
 
@@ -145,11 +149,19 @@ pub struct UserResponse {
     pub is_active: bool,
     pub is_admin: bool,
     pub created_at: DateTime<Utc>,
-    // Não incluir campos de bloqueio na resposta padrão
+    pub updated_at: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub roles: Option<Vec<String>>,
 }
 
 impl From<User> for UserResponse {
     fn from(user: User) -> Self {
+        let role_names = if user.roles.is_empty() {
+            None
+        } else {
+            Some(user.roles.iter().map(|r| r.name.clone()).collect())
+        };
+
         Self {
             id: user.id,
             email: user.email,
@@ -160,6 +172,8 @@ impl From<User> for UserResponse {
             is_active: user.is_active,
             is_admin: user.is_admin,
             created_at: user.created_at,
+            updated_at: user.updated_at,
+            roles: role_names,
         }
     }
 }

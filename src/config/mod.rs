@@ -1,7 +1,7 @@
 use dotenv::dotenv;
 use serde::Deserialize;
 use std::env;
-use tracing::info;
+use tracing::{info, error};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
@@ -47,22 +47,19 @@ pub struct EmailConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct SecurityConfig {
     pub password_salt_rounds: u32,
-    pub rate_limit_requests: u32,
-    pub rate_limit_duration: u32,
-    // Novas configurações para bloqueio de login
+    pub rate_limit_capacity: u32,
+    pub rate_limit_refill_rate: f64,
     pub max_login_attempts: u32,
-    pub lockout_duration_seconds: u64, // Usar u64 para durações potencialmente longas
-    pub unlock_token_duration_minutes: u64, // Duração do token de desbloqueio
+    pub lockout_duration_seconds: u64,
+    pub unlock_token_duration_minutes: u64,
     
-    // Configurações para keystroke dynamics
-    pub keystroke_threshold: Option<u8>,             // Limiar de similaridade para verificação de keystroke
-    pub keystroke_rate_limit_requests: Option<usize>, // Número máximo de tentativas de verificação
-    pub keystroke_rate_limit_duration: Option<u64>,  // Duração da janela de rate limiting em segundos
-    pub keystroke_block_duration: Option<u64>,       // Duração do bloqueio após exceder o limite
+    pub keystroke_threshold: Option<u8>,
+    pub keystroke_rate_limit_requests: Option<usize>,
+    pub keystroke_rate_limit_duration: Option<u64>,
+    pub keystroke_block_duration: Option<u64>,
     
-    // Configuração para verificação por email após login
-    pub email_verification_enabled: bool,            // Habilita/desabilita verificação por email após login 📧
-    pub csrf_secret: String, // <-- Adicionado Segredo para gerar e validar tokens CSRF 🛡️🍪
+    pub email_verification_enabled: bool,
+    pub csrf_secret: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -165,15 +162,22 @@ impl Config {
                 .unwrap_or_else(|_| "10".to_string())
                 .parse()
                 .unwrap_or(10),
-            rate_limit_requests: env::var("RATE_LIMIT_REQUESTS")
+            rate_limit_capacity: env::var("RATE_LIMIT_CAPACITY")
                 .unwrap_or_else(|_| "100".to_string())
-                .parse()
+                .parse::<u32>()
+                .map_err(|e| {
+                    error!("Falha ao parsear RATE_LIMIT_CAPACITY: {}. Usando padrão 100.", e);
+                    env::VarError::NotPresent
+                })
                 .unwrap_or(100),
-            rate_limit_duration: env::var("RATE_LIMIT_DURATION")
-                .unwrap_or_else(|_| "60".to_string())
-                .parse()
-                .unwrap_or(60),
-            // Carregar novas configurações de bloqueio
+            rate_limit_refill_rate: env::var("RATE_LIMIT_REFILL_RATE")
+                .unwrap_or_else(|_| "10.0".to_string())
+                .parse::<f64>()
+                .map_err(|e| {
+                    error!("Falha ao parsear RATE_LIMIT_REFILL_RATE: {}. Usando padrão 10.0.", e);
+                    env::VarError::NotPresent
+                })
+                .unwrap_or(10.0),
             max_login_attempts: env::var("MAX_LOGIN_ATTEMPTS")
                 .unwrap_or_else(|_| "5".to_string())
                 .parse()
@@ -187,7 +191,6 @@ impl Config {
                 .parse()
                 .unwrap_or(30),
             
-            // Carregar configurações para keystroke dynamics
             keystroke_threshold: env::var("SECURITY_KEYSTROKE_THRESHOLD")
                 .ok()
                 .and_then(|v| v.parse().ok()),
@@ -201,7 +204,6 @@ impl Config {
                 .ok()
                 .and_then(|v| v.parse().ok()),
                 
-            // Configuração para verificação por email após login
             email_verification_enabled: env::var("EMAIL_VERIFICATION_ENABLED")
                 .unwrap_or_else(|_| "true".to_string())
                 .parse()
