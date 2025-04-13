@@ -4,631 +4,410 @@ use crate::models::{
     permission::{CreatePermissionDto, Permission, UpdatePermissionDto},
     role::{CreateRoleDto, Role, UpdateRoleDto},
 };
-use chrono::Utc;
-use chrono::DateTime;
-use rusqlite::{params, OptionalExtension}; // Importar OptionalExtension
-use tracing::{error, info};
- // Importar Uuid
+// Usando o nome completo do caminho para evitar confusão com a resolução de módulos
+use crate::repositories::rbac_repository::SqliteRbacRepository;
+use tracing::{error, info, warn};
 
-pub struct RbacService;
+/// Serviço para gerenciar Lógica de Negócio de RBAC.
+#[derive(Clone)] // Adicionar Clone se o serviço for compartilhado (comum em web frameworks)
+pub struct RbacService {
+    pool: DbPool,
+}
 
 impl RbacService {
+    /// Cria uma nova instância do RbacService.
+    pub fn new(pool: DbPool) -> Self {
+        RbacService { pool }
+    }
+
     // --- Funções de Permissão ---
 
-    /// Cria uma nova permissão no sistema.
-    pub fn create_permission(pool: &DbPool, dto: CreatePermissionDto) -> Result<Permission, ApiError> {
-        let conn = pool.get()?;
-        let permission = Permission::new(dto.name.clone(), dto.description);
-
-        // Verifica se permissão com mesmo nome já existe
-        let exists: bool = conn.query_row(
-            "SELECT 1 FROM permissions WHERE name = ?1 LIMIT 1",
-            params![&permission.name],
-            |_| Ok(true),
-        ).optional()? // Usa optional() para não dar erro se não encontrar
-         .is_some();
-
-        if exists {
-            error!("Tentativa de criar permissão duplicada: {}", permission.name);
-            return Err(ApiError::ConflictError(format!(
-                "Permissão com nome '{}' já existe.",
-                permission.name
-            )));
+    /// Cria uma nova permissão.
+    pub fn create_permission(&self, dto: CreatePermissionDto) -> Result<Permission, ApiError> {
+        info!(name = %dto.name, "Tentando criar nova permissão 📜");
+        match SqliteRbacRepository::create_permission(&self.pool, dto) {
+            Ok(permission) => {
+                info!(id = %permission.id, name = %permission.name, "Permissão criada com sucesso ✅");
+                Ok(permission)
+            }
+            Err(e) => {
+                error!("Erro ao criar permissão: {}", e);
+                Err(e)
+            }
         }
-
-        conn.execute(
-            "INSERT INTO permissions (id, name, description, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![
-                &permission.id,
-                &permission.name,
-                &permission.description,
-                &permission.created_at.to_rfc3339(), // Salvar como string RFC3339
-                &permission.updated_at.to_rfc3339(), // Salvar como string RFC3339
-            ],
-        )?;
-
-        info!("📄 Permissão criada: {}", permission.name);
-        Ok(permission)
     }
 
     /// Busca uma permissão pelo seu ID.
-    pub fn get_permission_by_id(pool: &DbPool, permission_id: &str) -> Result<Permission, ApiError> {
-        let conn = pool.get()?;
-        conn.query_row(
-            "SELECT id, name, description, created_at, updated_at FROM permissions WHERE id = ?1",
-            params![permission_id],
-            |row| {
-                // Ler timestamps como string e fazer parse
-                let created_at_str: String = row.get(3)?;
-                let updated_at_str: String = row.get(4)?;
-                let created_at = DateTime::parse_from_rfc3339(&created_at_str)
-                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(3, rusqlite::types::Type::Text, Box::new(e)))?
-                    .with_timezone(&Utc);
-                let updated_at = DateTime::parse_from_rfc3339(&updated_at_str)
-                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(4, rusqlite::types::Type::Text, Box::new(e)))?
-                    .with_timezone(&Utc);
-                Ok(Permission {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    description: row.get(2)?,
-                    created_at,
-                    updated_at,
-                })
+    pub fn get_permission_by_id(&self, permission_id: &str) -> Result<Permission, ApiError> {
+        info!(id = %permission_id, "Buscando permissão por ID 🆔");
+        match SqliteRbacRepository::get_permission_by_id(&self.pool, permission_id) {
+            Ok(permission) => Ok(permission),
+            Err(ApiError::NotFoundError(msg)) => {
+                warn!("{}", msg);
+                Err(ApiError::NotFoundError(msg))
             },
-        ).map_err(|e| match e {
-            rusqlite::Error::QueryReturnedNoRows => ApiError::NotFoundError(format!("Permissão com ID {} não encontrada.", permission_id)),
-            rusqlite::Error::FromSqlConversionFailure(_, _, err) => {
-                 // Log do erro original de parse, se necessário
-                 error!("Erro ao fazer parse da data do banco de dados: {:?}", err);
-                 ApiError::DatabaseError(format!("Erro ao processar data da permissão: {}", err))
+            Err(e) => {
+                error!("Erro ao buscar permissão por ID {}: {}", permission_id, e);
+                Err(e)
             }
-            _ => ApiError::DatabaseError(e.to_string()),
-        })
+        }
     }
 
-     /// Busca uma permissão pelo seu nome único.
-     pub fn get_permission_by_name(pool: &DbPool, name: &str) -> Result<Permission, ApiError> {
-        let conn = pool.get()?;
-        conn.query_row(
-            "SELECT id, name, description, created_at, updated_at FROM permissions WHERE name = ?1",
-            params![name],
-            |row| {
-                let created_at_str: String = row.get(3)?;
-                let updated_at_str: String = row.get(4)?;
-                let created_at = DateTime::parse_from_rfc3339(&created_at_str)
-                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(3, rusqlite::types::Type::Text, Box::new(e)))?
-                    .with_timezone(&Utc);
-                let updated_at = DateTime::parse_from_rfc3339(&updated_at_str)
-                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(4, rusqlite::types::Type::Text, Box::new(e)))?
-                    .with_timezone(&Utc);
-                Ok(Permission {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    description: row.get(2)?,
-                    created_at,
-                    updated_at,
-                })
+    /// Busca uma permissão pelo seu nome.
+    pub fn get_permission_by_name(&self, name: &str) -> Result<Permission, ApiError> {
+        info!(name = %name, "Buscando permissão por nome 🏷️");
+        match SqliteRbacRepository::get_permission_by_name(&self.pool, name) {
+             Ok(permission) => Ok(permission),
+            Err(ApiError::NotFoundError(msg)) => {
+                warn!("{}", msg);
+                Err(ApiError::NotFoundError(msg))
             },
-        ).map_err(|e| match e {
-            rusqlite::Error::QueryReturnedNoRows => ApiError::NotFoundError(format!("Permissão com nome '{}' não encontrada.", name)),
-             rusqlite::Error::FromSqlConversionFailure(_, _, err) => {
-                 error!("Erro ao fazer parse da data do banco de dados: {:?}", err);
-                 ApiError::DatabaseError(format!("Erro ao processar data da permissão: {}", err))
+            Err(e) => {
+                error!("Erro ao buscar permissão por nome {}: {}", name, e);
+                Err(e)
             }
-            _ => ApiError::DatabaseError(e.to_string()),
-        })
+        }
     }
 
-    /// Lista todas as permissões (sem paginação por simplicidade inicial).
-    pub fn list_permissions(pool: &DbPool) -> Result<Vec<Permission>, ApiError> {
-        let conn = pool.get()?;
-        let mut stmt = conn.prepare("SELECT id, name, description, created_at, updated_at FROM permissions ORDER BY name")?;
-        let permission_iter = stmt.query_map([], |row| {
-            let created_at_str: String = row.get(3)?;
-            let updated_at_str: String = row.get(4)?;
-             let created_at = DateTime::parse_from_rfc3339(&created_at_str)
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(3, rusqlite::types::Type::Text, Box::new(e)))?
-                .with_timezone(&Utc);
-            let updated_at = DateTime::parse_from_rfc3339(&updated_at_str)
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(4, rusqlite::types::Type::Text, Box::new(e)))?
-                .with_timezone(&Utc);
-            Ok(Permission {
-                 id: row.get(0)?,
-                 name: row.get(1)?,
-                 description: row.get(2)?,
-                 created_at,
-                 updated_at,
-            })
-        })?;
-
-        let permissions = permission_iter.collect::<Result<Vec<_>, rusqlite::Error>>()
-            .map_err(|e| match e { // Mapear o erro da coleção também
-                rusqlite::Error::FromSqlConversionFailure(_, _, err) => {
-                    error!("Erro ao fazer parse da data do banco de dados durante a listagem: {:?}", err);
-                    ApiError::DatabaseError(format!("Erro ao processar data de uma permissão: {}", err))
-                }
-                _ => ApiError::DatabaseError(e.to_string()),
-            })?;
-        Ok(permissions)
+    /// Lista todas as permissões.
+    pub fn list_permissions(&self) -> Result<Vec<Permission>, ApiError> {
+        info!("Listando todas as permissões 📜");
+         match SqliteRbacRepository::list_permissions(&self.pool) {
+             Ok(permissions) => Ok(permissions),
+             Err(e) => {
+                error!("Erro ao listar permissões: {}", e);
+                Err(e)
+             }
+        }
     }
 
     /// Atualiza uma permissão existente.
-    pub fn update_permission(pool: &DbPool, permission_id: &str, dto: UpdatePermissionDto) -> Result<Permission, ApiError> {
-        let conn = pool.get()?;
-        // Verifica se a permissão existe antes de tentar atualizar
-        let current_permission = Self::get_permission_by_id(pool, permission_id)?;
+    pub fn update_permission(&self, permission_id: &str, dto: UpdatePermissionDto) -> Result<Permission, ApiError> {
+        info!(id = %permission_id, name = ?dto.name, description = ?dto.description, "Tentando atualizar permissão 🔄");
+        let current_permission = self.get_permission_by_id(permission_id)?;
 
-        // Clona o nome atual antes de usá-lo em unwrap_or para evitar mover o valor
-        let new_name = dto.name.unwrap_or_else(|| current_permission.name.clone());
-        let new_description = dto.description; // Permite definir a descrição como None
-
-        // Verifica se o novo nome já existe para outra permissão
-        if new_name != current_permission.name {
-            let exists: bool = conn.query_row(
-                "SELECT 1 FROM permissions WHERE name = ?1 AND id != ?2 LIMIT 1",
-                params![&new_name, permission_id],
-                |_| Ok(true),
-            ).optional()?.is_some();
-            if exists {
-                error!("Tentativa de atualizar permissão para nome duplicado: {}", new_name);
-                return Err(ApiError::ConflictError(format!("Permissão com nome '{}' já existe.", new_name)));
+        let name_to_update: String;
+        if let Some(new_name) = &dto.name {
+             if *new_name != current_permission.name {
+                match self.get_permission_by_name(new_name) {
+                    Ok(_) => {
+                        let err_msg = format!("Erro ao atualizar: Permissão com nome '{}' já existe.", new_name);
+                        warn!(err_msg);
+                        return Err(ApiError::ConflictError(err_msg));
+                    }
+                    Err(ApiError::NotFoundError(_)) => { /* Nome disponível */ }
+                    Err(e) => return Err(e),
+                }
+                name_to_update = new_name.clone();
+            } else {
+                name_to_update = current_permission.name;
             }
+        } else {
+            name_to_update = current_permission.name;
         }
 
-        let now = Utc::now().to_rfc3339();
-        conn.execute(
-            "UPDATE permissions SET name = ?1, description = ?2, updated_at = ?3 WHERE id = ?4",
-            params![
-                new_name,
-                new_description,
-                now,
-                permission_id
-            ],
-        )?;
+        let description_to_update: Option<String>;
+        if let Some(inner_string) = dto.description {
+            description_to_update = Some(inner_string);
+        } else {
+            description_to_update = current_permission.description;
+        }
 
-        info!("📄 Permissão atualizada: {}", permission_id);
-
-        // Retorna a permissão atualizada (buscando novamente)
-        Self::get_permission_by_id(pool, permission_id)
+        match SqliteRbacRepository::update_permission(&self.pool, permission_id, &name_to_update, &description_to_update) {
+             Ok(_) => {
+                 info!(id = %permission_id, "Permissão atualizada com sucesso. Buscando novamente... ✅");
+                 self.get_permission_by_id(permission_id)
+             }
+             Err(ApiError::NotFoundError(msg)) => {
+                 warn!("{}", msg);
+                 Err(ApiError::NotFoundError(msg))
+             }
+             Err(e) => {
+                 error!("Erro ao atualizar permissão {}: {}", permission_id, e);
+                 Err(e)
+             }
+        }
     }
 
-    /// Deleta uma permissão pelo seu ID.
-    /// CUIDADO: Isso removerá a permissão de todos os papéis associados devido ao ON DELETE CASCADE.
-    pub fn delete_permission(pool: &DbPool, permission_id: &str) -> Result<(), ApiError> {
-        let conn = pool.get()?;
-        let changes = conn.execute("DELETE FROM permissions WHERE id = ?1", params![permission_id])?;
-
-        if changes == 0 {
-            Err(ApiError::NotFoundError(format!("Permissão com ID {} não encontrada para deletar.", permission_id)))
-        } else {
-            info!("🗑️ Permissão deletada: {}", permission_id);
-            Ok(())
+    /// Deleta uma permissão.
+    pub fn delete_permission(&self, permission_id: &str) -> Result<(), ApiError> {
+        info!(id = %permission_id, "Tentando deletar permissão 🗑️");
+        match SqliteRbacRepository::delete_permission(&self.pool, permission_id) {
+            Ok(0) => {
+                let msg = format!("Permissão com ID {} não encontrada para deletar.", permission_id);
+                warn!(msg);
+                Err(ApiError::NotFoundError(msg))
+            }
+            Ok(_) => {
+                 info!(id = %permission_id, "Permissão deletada com sucesso ✅");
+                 Ok(())
+            }
+             Err(e) => {
+                error!("Erro ao deletar permissão {}: {}", permission_id, e);
+                Err(e)
+            }
         }
     }
 
     // --- Funções de Papel (Role) ---
 
-    /// Cria um novo papel (role) no sistema.
-    pub fn create_role(pool: &DbPool, dto: CreateRoleDto) -> Result<Role, ApiError> {
-        let conn = pool.get()?;
-        let role = Role::new(dto.name.clone(), dto.description);
-
-        // Verifica se papel com mesmo nome já existe
-        let exists: bool = conn.query_row(
-            "SELECT 1 FROM roles WHERE name = ?1 LIMIT 1",
-            params![&role.name],
-            |_| Ok(true),
-        ).optional()?
-         .is_some();
-
-        if exists {
-            error!("🎭 Tentativa de criar papel duplicado: {}", role.name);
-            return Err(ApiError::ConflictError(format!(
-                "Papel com nome '{}' já existe.",
-                role.name
-            )));
+    /// Cria um novo papel.
+    pub fn create_role(&self, dto: CreateRoleDto) -> Result<Role, ApiError> {
+        info!(name = %dto.name, "Tentando criar novo papel 🗂️");
+        match SqliteRbacRepository::create_role(&self.pool, dto) {
+            Ok(role) => {
+                info!(id = %role.id, name = %role.name, "Papel criado com sucesso ✅");
+                Ok(role)
+            }
+            Err(e) => {
+                error!("Erro ao criar papel: {}", e);
+                Err(e)
+            }
         }
-
-        conn.execute(
-            "INSERT INTO roles (id, name, description, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![
-                &role.id,
-                &role.name,
-                &role.description,
-                &role.created_at.to_rfc3339(),
-                &role.updated_at.to_rfc3339(),
-            ],
-        )?;
-
-        info!("🎭 Papel criado: {}", role.name);
-        Ok(role)
     }
 
     /// Busca um papel pelo seu ID.
-    pub fn get_role_by_id(pool: &DbPool, role_id: &str) -> Result<Role, ApiError> {
-        let conn = pool.get()?;
-        conn.query_row(
-            "SELECT id, name, description, created_at, updated_at FROM roles WHERE id = ?1",
-            params![role_id],
-            |row| {
-                let created_at_str: String = row.get(3)?;
-                let updated_at_str: String = row.get(4)?;
-                let created_at = DateTime::parse_from_rfc3339(&created_at_str)
-                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(3, rusqlite::types::Type::Text, Box::new(e)))?
-                    .with_timezone(&Utc);
-                let updated_at = DateTime::parse_from_rfc3339(&updated_at_str)
-                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(4, rusqlite::types::Type::Text, Box::new(e)))?
-                    .with_timezone(&Utc);
-                Ok(Role {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    description: row.get(2)?,
-                    created_at,
-                    updated_at,
-                })
+    pub fn get_role_by_id(&self, role_id: &str) -> Result<Role, ApiError> {
+        info!(id = %role_id, "Buscando papel por ID 🆔");
+        match SqliteRbacRepository::get_role_by_id(&self.pool, role_id) {
+            Ok(role) => Ok(role),
+            Err(ApiError::NotFoundError(msg)) => {
+                warn!("{}", msg);
+                Err(ApiError::NotFoundError(msg))
             },
-        ).map_err(|e| match e {
-            rusqlite::Error::QueryReturnedNoRows => ApiError::NotFoundError(format!("Papel com ID {} não encontrado.", role_id)),
-            rusqlite::Error::FromSqlConversionFailure(_, _, err) => {
-                 error!("🎭 Erro ao fazer parse da data do banco de dados para papel: {:?}", err);
-                 ApiError::DatabaseError(format!("Erro ao processar data do papel: {}", err))
+            Err(e) => {
+                error!("Erro ao buscar papel por ID {}: {}", role_id, e);
+                Err(e)
             }
-            _ => ApiError::DatabaseError(e.to_string()),
-        })
+        }
     }
 
-     /// Busca um papel pelo seu nome único.
-     pub fn get_role_by_name(pool: &DbPool, name: &str) -> Result<Role, ApiError> {
-        let conn = pool.get()?;
-        conn.query_row(
-            "SELECT id, name, description, created_at, updated_at FROM roles WHERE name = ?1",
-            params![name],
-             |row| {
-                let created_at_str: String = row.get(3)?;
-                let updated_at_str: String = row.get(4)?;
-                let created_at = DateTime::parse_from_rfc3339(&created_at_str)
-                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(3, rusqlite::types::Type::Text, Box::new(e)))?
-                    .with_timezone(&Utc);
-                let updated_at = DateTime::parse_from_rfc3339(&updated_at_str)
-                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(4, rusqlite::types::Type::Text, Box::new(e)))?
-                    .with_timezone(&Utc);
-                Ok(Role {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    description: row.get(2)?,
-                    created_at,
-                    updated_at,
-                })
+    /// Busca um papel pelo seu nome.
+    pub fn get_role_by_name(&self, name: &str) -> Result<Role, ApiError> {
+        info!(name = %name, "Buscando papel por nome 🏷️");
+        match SqliteRbacRepository::get_role_by_name(&self.pool, name) {
+            Ok(role) => Ok(role),
+            Err(ApiError::NotFoundError(msg)) => {
+                warn!("{}", msg);
+                Err(ApiError::NotFoundError(msg))
             },
-        ).map_err(|e| match e {
-            rusqlite::Error::QueryReturnedNoRows => ApiError::NotFoundError(format!("Papel com nome '{}' não encontrado.", name)),
-            rusqlite::Error::FromSqlConversionFailure(_, _, err) => {
-                 error!("🎭 Erro ao fazer parse da data do banco de dados para papel: {:?}", err);
-                 ApiError::DatabaseError(format!("Erro ao processar data do papel: {}", err))
+            Err(e) => {
+                error!("Erro ao buscar papel por nome {}: {}", name, e);
+                Err(e)
             }
-            _ => ApiError::DatabaseError(e.to_string()),
-        })
+        }
     }
 
-    /// Lista todos os papéis (sem paginação).
-    pub fn list_roles(pool: &DbPool) -> Result<Vec<Role>, ApiError> {
-        let conn = pool.get()?;
-        let mut stmt = conn.prepare("SELECT id, name, description, created_at, updated_at FROM roles ORDER BY name")?;
-        let role_iter = stmt.query_map([], |row| {
-            let created_at_str: String = row.get(3)?;
-            let updated_at_str: String = row.get(4)?;
-             let created_at = DateTime::parse_from_rfc3339(&created_at_str)
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(3, rusqlite::types::Type::Text, Box::new(e)))?
-                .with_timezone(&Utc);
-            let updated_at = DateTime::parse_from_rfc3339(&updated_at_str)
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(4, rusqlite::types::Type::Text, Box::new(e)))?
-                .with_timezone(&Utc);
-            Ok(Role {
-                 id: row.get(0)?,
-                 name: row.get(1)?,
-                 description: row.get(2)?,
-                 created_at,
-                 updated_at,
-            })
-        })?;
-
-        let roles = role_iter.collect::<Result<Vec<_>, rusqlite::Error>>()
-            .map_err(|e| match e { // Mapear o erro da coleção também
-                rusqlite::Error::FromSqlConversionFailure(_, _, err) => {
-                    error!("🎭 Erro ao fazer parse da data do banco de dados durante a listagem de papéis: {:?}", err);
-                    ApiError::DatabaseError(format!("Erro ao processar data de um papel: {}", err))
-                }
-                _ => ApiError::DatabaseError(e.to_string()),
-            })?;
-        Ok(roles)
+    /// Lista todos os papéis.
+    pub fn list_roles(&self) -> Result<Vec<Role>, ApiError> {
+        info!("Listando todos os papéis 📜");
+        match SqliteRbacRepository::list_roles(&self.pool) {
+             Ok(roles) => Ok(roles),
+             Err(e) => {
+                error!("Erro ao listar papéis: {}", e);
+                Err(e)
+             }
+        }
     }
 
     /// Atualiza um papel existente.
-    pub fn update_role(pool: &DbPool, role_id: &str, dto: UpdateRoleDto) -> Result<Role, ApiError> {
-        let conn = pool.get()?;
-        let current_role = Self::get_role_by_id(pool, role_id)?;
+    pub fn update_role(&self, role_id: &str, dto: UpdateRoleDto) -> Result<(), ApiError> {
+        info!(id = %role_id, name = ?dto.name, description = ?dto.description, "Tentando atualizar papel 🔄");
+        let current_role = self.get_role_by_id(role_id)?;
 
-        let new_name = dto.name.unwrap_or_else(|| current_role.name.clone());
-
-        // Trata Option<Option<String>> para description
-        // None -> não muda
-        // Some(None) -> define como NULL no DB
-        // Some(Some(value)) -> define como novo valor
-        let new_description = match dto.description {
-            None => current_role.description, // Não muda
-            Some(desc_option) => desc_option, // Define como Some(value) ou None (NULL)
-        };
-
-        if new_name != current_role.name {
-            let exists: bool = conn.query_row(
-                "SELECT 1 FROM roles WHERE name = ?1 AND id != ?2 LIMIT 1",
-                params![&new_name, role_id],
-                |_| Ok(true),
-            ).optional()?.is_some();
-            if exists {
-                error!("🎭 Tentativa de atualizar papel para nome duplicado: {}", new_name);
-                return Err(ApiError::ConflictError(format!("Papel com nome '{}' já existe.", new_name)));
+        let name_to_update: String;
+        if let Some(new_name) = &dto.name {
+             if *new_name != current_role.name {
+                match self.get_role_by_name(new_name) {
+                    Ok(_) => {
+                        let err_msg = format!("Erro ao atualizar: Papel com nome '{}' já existe.", new_name);
+                        warn!(err_msg);
+                        return Err(ApiError::ConflictError(err_msg));
+                    }
+                    Err(ApiError::NotFoundError(_)) => { /* Nome disponível */ }
+                    Err(e) => return Err(e),
+                }
+                 name_to_update = new_name.clone();
+            } else {
+                 name_to_update = current_role.name;
             }
+        } else {
+            name_to_update = current_role.name;
         }
 
-        let now = Utc::now().to_rfc3339();
-        conn.execute(
-            "UPDATE roles SET name = ?1, description = ?2, updated_at = ?3 WHERE id = ?4",
-            params![
-                new_name,
-                new_description,
-                now,
-                role_id
-            ],
-        )?;
+        let description_to_update: Option<String>;
+        if let Some(inner_option) = dto.description {
+            description_to_update = inner_option;
+        } else {
+            description_to_update = current_role.description;
+        }
 
-        info!("🎭 Papel atualizado: {}", role_id);
-        Self::get_role_by_id(pool, role_id)
+        match SqliteRbacRepository::update_role(&self.pool, role_id, &name_to_update, &description_to_update) {
+            Ok(_) => {
+                info!(id = %role_id, "Papel atualizado com sucesso ✅");
+                Ok(())
+            }
+            Err(ApiError::NotFoundError(msg)) => {
+                 warn!("{}", msg);
+                 Err(ApiError::NotFoundError(msg))
+            }
+            Err(e) => {
+                error!("Erro ao atualizar papel {}: {}", role_id, e);
+                Err(e)
+            }
+        }
     }
 
-    /// Deleta um papel pelo seu ID.
-    /// CUIDADO: Isso removerá o papel de todos os usuários associados devido ao ON DELETE CASCADE.
-    pub fn delete_role(pool: &DbPool, role_id: &str) -> Result<(), ApiError> {
-        let conn = pool.get()?;
-        let changes = conn.execute("DELETE FROM roles WHERE id = ?1", params![role_id])?;
-
-        if changes == 0 {
-            Err(ApiError::NotFoundError(format!("Papel com ID {} não encontrado para deletar.", role_id)))
-        } else {
-            info!("🗑️ Papel deletado: {}", role_id);
-            Ok(())
+    /// Deleta um papel.
+    pub fn delete_role(&self, role_id: &str) -> Result<(), ApiError> {
+        info!(id = %role_id, "Tentando deletar papel 🗑️");
+        match SqliteRbacRepository::delete_role(&self.pool, role_id) {
+            Ok(0) => {
+                let msg = format!("Papel com ID {} não encontrado para deletar.", role_id);
+                warn!(msg);
+                Err(ApiError::NotFoundError(msg))
+            }
+            Ok(_) => {
+                info!(id = %role_id, "Papel deletado com sucesso ✅");
+                Ok(())
+            }
+            Err(e) => {
+                error!("Erro ao deletar papel {}: {}", role_id, e);
+                Err(e)
+            }
         }
     }
 
     // --- Funções de Associação ---
 
     /// Associa uma permissão a um papel.
-    pub fn assign_permission_to_role(pool: &DbPool, role_id: &str, permission_id: &str) -> Result<(), ApiError> {
-        // Opcional: Verificar se role_id e permission_id existem antes de inserir.
-        // Por simplicidade e performance, podemos confiar nas constraints FK do DB,
-        // mas isso retornaria um erro genérico de DB em vez de NotFound.
-        // Para retornar NotFound específico, teríamos que fazer SELECTs antes.
-        // Exemplo: Self::get_role_by_id(pool, role_id)?; Self::get_permission_by_id(pool, permission_id)?;
-
-        let conn = pool.get()?;
-        match conn.execute(
-            "INSERT OR IGNORE INTO role_permissions (role_id, permission_id) VALUES (?1, ?2)",
-            params![role_id, permission_id],
-        ) {
-            Ok(changes) => {
-                if changes > 0 {
-                    info!("🔗 Permissão {} associada ao Papel {}", permission_id, role_id);
-                } else {
-                    info!("🔗 Associação entre Papel {} e Permissão {} já existia.", role_id, permission_id);
-                }
+    pub fn assign_permission_to_role(&self, role_id: &str, permission_id: &str) -> Result<(), ApiError> {
+        info!(role_id = %role_id, permission_id = %permission_id, "Associando permissão a papel 🔗");
+        match SqliteRbacRepository::assign_permission_to_role(&self.pool, role_id, permission_id) {
+            Ok(0) => {
+                info!("Associação entre Papel {} e Permissão {} já existia.", role_id, permission_id);
                 Ok(())
             }
+            Ok(_) => {
+                info!("Permissão {} associada ao Papel {} com sucesso.", permission_id, role_id);
+                Ok(())
+            }
+            Err(ApiError::NotFoundError(msg)) => {
+                warn!("Falha ao associar: {}", msg);
+                Err(ApiError::NotFoundError(msg))
+            }
             Err(e) => {
-                // Se não confiarmos no FK, podemos ter erros diferentes.
-                // Se confiarmos, um erro aqui provavelmente é de constraint (ex: ID não existe)
-                error!("🎭📄 Erro ao associar permissão {} ao papel {}: {}", permission_id, role_id, e);
-                // Mapear erro específico de FK se possível, senão erro genérico.
-                // Rusqlite pode retornar Error::SqliteFailure(.., Some(extended_code))
-                // extended_code 787 é FOREIGN KEY constraint failed
-                if let rusqlite::Error::SqliteFailure(err, _) = &e {
-                    if err.extended_code == 787 { // FOREIGN KEY constraint failed
-                         // Poderia verificar qual ID não existe, mas é complexo. Retornar um erro genérico.
-                         return Err(ApiError::NotFoundError(format!("Papel ID {} ou Permissão ID {} não encontrado.", role_id, permission_id)));
-                    }
-                }
-                Err(ApiError::DatabaseError(format!("Erro ao associar permissão: {}", e)))
+                error!("Erro ao associar permissão {} ao papel {}: {}", permission_id, role_id, e);
+                Err(e)
             }
         }
     }
 
     /// Remove a associação entre uma permissão e um papel.
-    pub fn revoke_permission_from_role(pool: &DbPool, role_id: &str, permission_id: &str) -> Result<(), ApiError> {
-        let conn = pool.get()?;
-        let changes = conn.execute(
-            "DELETE FROM role_permissions WHERE role_id = ?1 AND permission_id = ?2",
-            params![role_id, permission_id],
-        )?;
-
-        if changes == 0 {
-            // Isso pode significar que a associação não existia, ou que os IDs não existem.
-            // Para ser mais preciso, poderíamos verificar a existência dos IDs antes.
-            Err(ApiError::NotFoundError(format!(
-                "Associação entre Papel {} e Permissão {} não encontrada para revogar.",
-                role_id, permission_id
-            )))
-        } else {
-            info!("🗑️ Associação entre Papel {} e Permissão {} revogada.", role_id, permission_id);
-            Ok(())
+    pub fn revoke_permission_from_role(&self, role_id: &str, permission_id: &str) -> Result<(), ApiError> {
+        info!(role_id = %role_id, permission_id = %permission_id, "Revogando permissão de papel 🗑️🔗");
+        match SqliteRbacRepository::revoke_permission_from_role(&self.pool, role_id, permission_id) {
+            Ok(0) => {
+                let msg = format!("Associação entre Papel {} e Permissão {} não encontrada para revogar.", role_id, permission_id);
+                warn!(msg);
+                Err(ApiError::NotFoundError(msg))
+            }
+            Ok(_) => {
+                info!("Associação entre Papel {} e Permissão {} revogada com sucesso.", role_id, permission_id);
+                Ok(())
+            }
+             Err(e) => {
+                error!("Erro ao revogar permissão {} do papel {}: {}", permission_id, role_id, e);
+                Err(e)
+            }
         }
     }
 
     /// Lista todas as permissões associadas a um papel específico.
-    pub fn get_role_permissions(pool: &DbPool, role_id: &str) -> Result<Vec<Permission>, ApiError> {
-         // Primeiro, verificar se o papel existe
-        Self::get_role_by_id(pool, role_id)?;
+    pub fn get_role_permissions(&self, role_id: &str) -> Result<Vec<Permission>, ApiError> {
+         info!(role_id = %role_id, "Listando permissões do papel 📜");
+        self.get_role_by_id(role_id)?;
 
-        let conn = pool.get()?;
-        let mut stmt = conn.prepare(
-            "SELECT p.id, p.name, p.description, p.created_at, p.updated_at 
-             FROM permissions p
-             JOIN role_permissions rp ON p.id = rp.permission_id
-             WHERE rp.role_id = ?1
-             ORDER BY p.name" )?;
-        
-        let permission_iter = stmt.query_map(params![role_id], |row| {
-            let created_at_str: String = row.get(3)?;
-            let updated_at_str: String = row.get(4)?;
-             let created_at = DateTime::parse_from_rfc3339(&created_at_str)
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(3, rusqlite::types::Type::Text, Box::new(e)))?
-                .with_timezone(&Utc);
-            let updated_at = DateTime::parse_from_rfc3339(&updated_at_str)
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(4, rusqlite::types::Type::Text, Box::new(e)))?
-                .with_timezone(&Utc);
-            Ok(Permission {
-                 id: row.get(0)?,
-                 name: row.get(1)?,
-                 description: row.get(2)?,
-                 created_at,
-                 updated_at,
-            })
-        })?;
-
-        let permissions = permission_iter.collect::<Result<Vec<_>, rusqlite::Error>>()
-            .map_err(|e| match e {
-                rusqlite::Error::FromSqlConversionFailure(_, _, err) => {
-                    error!("📄 Erro ao fazer parse da data de permissão ao buscar permissões do papel {}: {:?}", role_id, err);
-                    ApiError::DatabaseError(format!("Erro ao processar data de uma permissão: {}", err))
-                }
-                _ => ApiError::DatabaseError(e.to_string()),
-            })?;
-        Ok(permissions)
+        match SqliteRbacRepository::get_role_permissions(&self.pool, role_id) {
+            Ok(permissions) => Ok(permissions),
+            Err(e) => {
+                 error!("Erro ao listar permissões do papel {}: {}", role_id, e);
+                 Err(e)
+            }
+        }
     }
 
     /// Associa um papel a um usuário.
-    pub fn assign_role_to_user(pool: &DbPool, user_id: &str, role_id: &str) -> Result<(), ApiError> {
-        // Opcional: Verificar se user_id e role_id existem.
-        // Para retornar NotFound específico: 
-        // UserService::get_user_by_id(pool, user_id)?; // Precisaria injetar ou acessar UserService
-        // Self::get_role_by_id(pool, role_id)?;
-        // Por ora, confiaremos na FK constraint do DB.
-
-        let conn = pool.get()?;
-        match conn.execute(
-            "INSERT OR IGNORE INTO user_roles (user_id, role_id) VALUES (?1, ?2)",
-            params![user_id, role_id],
-        ) {
-            Ok(changes) => {
-                if changes > 0 {
-                    info!("👤🎭 Papel {} associado ao Usuário {}", role_id, user_id);
-                } else {
-                    info!("👤🎭 Associação entre Usuário {} e Papel {} já existia.", user_id, role_id);
-                }
+    pub fn assign_role_to_user(&self, user_id: &str, role_id: &str) -> Result<(), ApiError> {
+        info!(user_id = %user_id, role_id = %role_id, "Associando papel a usuário 👤🎭");
+        match SqliteRbacRepository::assign_role_to_user(&self.pool, user_id, role_id) {
+             Ok(0) => {
+                info!("Associação entre Usuário {} e Papel {} já existia.", user_id, role_id);
                 Ok(())
             }
+            Ok(_) => {
+                info!("Papel {} associado ao Usuário {} com sucesso.", role_id, user_id);
+                Ok(())
+            }
+            Err(ApiError::NotFoundError(msg)) => {
+                 warn!("Falha ao associar: {}", msg);
+                 Err(ApiError::NotFoundError(msg))
+            }
             Err(e) => {
-                error!("👤🎭 Erro ao associar papel {} ao usuário {}: {}", role_id, user_id, e);
-                 if let rusqlite::Error::SqliteFailure(err, _) = &e {
-                    if err.extended_code == 787 { // FOREIGN KEY constraint failed
-                         return Err(ApiError::NotFoundError(format!("Usuário ID {} ou Papel ID {} não encontrado.", user_id, role_id)));
-                    }
-                }
-                Err(ApiError::DatabaseError(format!("Erro ao associar papel: {}", e)))
+                error!("Erro ao associar papel {} ao usuário {}: {}", role_id, user_id, e);
+                Err(e)
             }
         }
     }
 
     /// Remove a associação entre um usuário e um papel.
-    pub fn revoke_role_from_user(pool: &DbPool, user_id: &str, role_id: &str) -> Result<(), ApiError> {
-        let conn = pool.get()?;
-        let changes = conn.execute(
-            "DELETE FROM user_roles WHERE user_id = ?1 AND role_id = ?2",
-            params![user_id, role_id],
-        )?;
-
-        if changes == 0 {
-             Err(ApiError::NotFoundError(format!(
-                "Associação entre Usuário {} e Papel {} não encontrada para revogar.",
-                user_id, role_id
-            )))
-        } else {
-            info!("🗑️ Associação entre Usuário {} e Papel {} revogada.", user_id, role_id);
-            Ok(())
+    pub fn revoke_role_from_user(&self, user_id: &str, role_id: &str) -> Result<(), ApiError> {
+        info!(user_id = %user_id, role_id = %role_id, "Revogando papel de usuário 🗑️👤🎭");
+        match SqliteRbacRepository::revoke_role_from_user(&self.pool, user_id, role_id) {
+            Ok(0) => {
+                 let msg = format!("Associação entre Usuário {} e Papel {} não encontrada para revogar.", user_id, role_id);
+                 warn!(msg);
+                 Err(ApiError::NotFoundError(msg))
+            }
+            Ok(_) => {
+                info!("Associação entre Usuário {} e Papel {} revogada com sucesso.", user_id, role_id);
+                Ok(())
+            }
+             Err(e) => {
+                error!("Erro ao revogar papel {} do usuário {}: {}", role_id, user_id, e);
+                Err(e)
+            }
         }
     }
 
     /// Lista todos os papéis associados a um usuário específico.
-    pub fn get_user_roles(pool: &DbPool, user_id: &str) -> Result<Vec<Role>, ApiError> {
-        // Opcional: Verificar se o usuário existe primeiro.
-        // UserService::get_user_by_id(pool, user_id)?;
-
-        let conn = pool.get()?;
-        let mut stmt = conn.prepare(
-            "SELECT r.id, r.name, r.description, r.created_at, r.updated_at 
-             FROM roles r
-             JOIN user_roles ur ON r.id = ur.role_id
-             WHERE ur.user_id = ?1
-             ORDER BY r.name")?;
-        
-        let role_iter = stmt.query_map(params![user_id], |row| {
-            let created_at_str: String = row.get(3)?;
-            let updated_at_str: String = row.get(4)?;
-            let created_at = DateTime::parse_from_rfc3339(&created_at_str)
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(3, rusqlite::types::Type::Text, Box::new(e)))?
-                .with_timezone(&Utc);
-            let updated_at = DateTime::parse_from_rfc3339(&updated_at_str)
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(4, rusqlite::types::Type::Text, Box::new(e)))?
-                .with_timezone(&Utc);
-            Ok(Role {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                description: row.get(2)?,
-                created_at,
-                updated_at,
-            })
-        })?;
-
-        let roles = role_iter.collect::<Result<Vec<_>, rusqlite::Error>>()
-             .map_err(|e| match e {
-                rusqlite::Error::FromSqlConversionFailure(_, _, err) => {
-                    error!("🎭 Erro ao fazer parse da data de papel ao buscar papéis do usuário {}: {:?}", user_id, err);
-                    ApiError::DatabaseError(format!("Erro ao processar data de um papel: {}", err))
-                }
-                _ => ApiError::DatabaseError(e.to_string()),
-            })?;
-        Ok(roles)
+    pub fn get_user_roles(&self, user_id: &str) -> Result<Vec<Role>, ApiError> {
+        info!(user_id = %user_id, "Listando papéis do usuário 🧑‍🤝‍🧑");
+        match SqliteRbacRepository::get_user_roles(&self.pool, user_id) {
+            Ok(roles) => Ok(roles),
+            Err(e) => {
+                 error!("Erro ao listar papéis do usuário {}: {}", user_id, e);
+                 Err(e)
+            }
+        }
     }
 
     /// Verifica se um usuário possui uma permissão específica (através dos papéis associados).
-    pub fn check_user_permission(pool: &DbPool, user_id: &str, permission_name: &str) -> Result<bool, ApiError> {
-        // Opcional: Verificar se usuário e permissão existem.
-        // UserService::get_user_by_id(pool, user_id)?;
-        // Self::get_permission_by_name(pool, permission_name)?;
-
-        let conn = pool.get()?;
-
-        // A consulta verifica se existe ALGUMA linha que conecte o user_id à permission_name
-        // através das tabelas de junção user_roles e role_permissions.
-        let has_permission: bool = conn.query_row(
-            "SELECT EXISTS (
-                SELECT 1
-                FROM user_roles ur
-                JOIN role_permissions rp ON ur.role_id = rp.role_id
-                JOIN permissions p ON rp.permission_id = p.id
-                WHERE ur.user_id = ?1 AND p.name = ?2
-                LIMIT 1
-            )",
-            params![user_id, permission_name],
-            |row| row.get(0), // Pega o resultado do EXISTS (0 ou 1)
-        )?;
-
-        if has_permission {
-             info!("✅ Verificação de permissão: Usuário {} TEM a permissão '{}'.", user_id, permission_name);
-        } else {
-             info!("❌ Verificação de permissão: Usuário {} NÃO TEM a permissão '{}'.", user_id, permission_name);
+    pub fn check_user_permission(&self, user_id: &str, permission_name: &str) -> Result<bool, ApiError> {
+        info!(user_id = %user_id, permission_name = %permission_name, "Verificando permissão do usuário 🤔");
+        match SqliteRbacRepository::check_user_permission(&self.pool, user_id, permission_name) {
+            Ok(has_permission) => {
+                if has_permission {
+                     info!("Resultado verificação: Usuário {} TEM a permissão '{}'. ✅", user_id, permission_name);
+                } else {
+                     info!("Resultado verificação: Usuário {} NÃO TEM a permissão '{}'. ❌", user_id, permission_name);
+                }
+                Ok(has_permission)
+            }
+             Err(e) => {
+                error!("Erro ao verificar permissão '{}' para usuário {}: {}", permission_name, user_id, e);
+                Err(e)
+            }
         }
-
-        Ok(has_permission)
-        // Em caso de erro na query (ex: problema de conexão), o ? propagará o ApiError::DatabaseError.
     }
-
 } 

@@ -1,17 +1,16 @@
 use crate::{
-    db::DbPool,
     errors::ApiError,
     middleware::auth::AuthenticatedUser, // Para obter o ID do usuário logado
     services::rbac_service::RbacService,
 };
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-    web::Data, // Para acessar o DbPool
     Error, HttpMessage, // Para acessar extensões e app_data
+    web, // Adicionar import do módulo web
 };
 use futures_util::future::{self, LocalBoxFuture, Ready};
 use std::rc::Rc;
-use tracing::warn;
+use tracing::{warn};
 
 // Fábrica do Middleware
 #[derive(Clone)]
@@ -75,11 +74,14 @@ where
         // Tentar obter o usuário autenticado das extensões
         let user_result = req.extensions().get::<AuthenticatedUser>().cloned();
 
-        // Tentar obter o DbPool dos dados da aplicação
-        let pool_result = req.app_data::<Data<DbPool>>().cloned(); // Clona o Data<DbPool> (Arc)
+        // Tenta extrair o RbacService do app_data.
+        // Importante: O RbacService precisa ser adicionado como app_data na configuração do App.
+        let rbac_service_opt = req
+            .app_data::<web::Data<RbacService>>()
+            .map(|data| data.get_ref().clone()); // Clonar o serviço
 
         // --- Início da Lógica Síncrona (dentro do Box::pin) ---
-        // Verificar se conseguimos obter o usuário e o pool
+        // Verificar se conseguimos obter o usuário e o rbac_service
         let user = match user_result {
             Some(u) => u,
             None => {
@@ -90,18 +92,18 @@ where
             }
         };
 
-        let pool = match pool_result {
-            Some(p) => p,
+        let rbac_service = match rbac_service_opt {
+            Some(rbac_service) => rbac_service,
             None => {
-                warn!("🛡️ Falha na Autorização: DbPool não encontrado nos dados da aplicação.");
+                warn!("🛡️ Falha na Autorização: RbacService não encontrado nos dados da aplicação.");
                 return Box::pin(future::err(ApiError::InternalServerError(
-                    "Erro interno de configuração do servidor (DbPool).".to_string(),
+                    "Erro interno de configuração do servidor (RbacService).".to_string(),
                 ).into()));
             }
         };
 
         // Verificar a permissão usando o RbacService (chamada síncrona!)
-        match RbacService::check_user_permission(&pool, &user.id, &required_permission) { // SEM .await
+        match RbacService::check_user_permission(&rbac_service, &user.id, &required_permission) { // SEM .await
             Ok(true) => {
                 // Usuário tem a permissão, prosseguir com a requisição
                  Box::pin(async move { service.call(req).await }) // Chamar o próximo serviço

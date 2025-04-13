@@ -5,6 +5,7 @@ mod db;
 mod errors;
 mod middleware;
 mod models;
+mod repositories;
 mod routes;
 mod services;
 mod utils;
@@ -19,6 +20,7 @@ use middleware::security::configure_security;
 use moka::future::Cache;
 use crate::models::auth::TokenClaims; // Alterado de Session para TokenClaims
 use std::time::Duration;
+use crate::services::rbac_service::RbacService;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -89,6 +91,10 @@ async fn main() -> std::io::Result<()> {
         .build();
     info!("✅ Cache de validação de token (Moka) inicializado com sucesso");
 
+    // Inicializa o serviço RBAC
+    let rbac_service = RbacService::new(pool.clone());
+    info!("✅ Serviço RBAC inicializado com sucesso");
+
     // Configura os middlewares de segurança
     let (security_headers, _csrf_protection) = configure_security(&config.jwt.secret);
     
@@ -109,7 +115,8 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(pool.clone()))
             .app_data(web::Data::new(server_config.clone()))
             .app_data(web::Data::new(email_service.clone()))
-            .app_data(web::Data::new(token_cache.clone())) // Adiciona o cache aos dados da app
+            .app_data(web::Data::new(token_cache.clone()))
+            .app_data(web::Data::new(rbac_service.clone()))
             .app_data(web::JsonConfig::default().limit(4096))
             .app_data(cookie_key.clone())
             // Servir arquivos estáticos da pasta 'static'

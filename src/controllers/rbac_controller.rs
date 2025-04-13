@@ -1,20 +1,12 @@
-use crate::{
-    db::DbPool,
-    errors::ApiError,
-    models::{        permission::{CreatePermissionDto, Permission, UpdatePermissionDto},
-        role::{CreateRoleDto, Role, UpdateRoleDto},
-    },
-    services::rbac_service::RbacService,
+use actix_web::{web, HttpResponse, Responder, Result as ActixResult, get, post, put, delete};
+// use crate::errors::ApiError; // Remover se não usado
+use crate::models::{
+    permission::{CreatePermissionDto, /*Permission,*/ UpdatePermissionDto}, // Remover Permission
+    role::{CreateRoleDto, /*Role,*/ UpdateRoleDto}, // Remover Role
 };
-use actix_web::{
-    delete, get, post, put,
-    web::{self, Data, Json, Path},
-    HttpResponse,
-};
-use validator::Validate;
-use serde::Serialize;
-use crate::middleware::auth::AuthenticatedUser;
+use crate::services::rbac_service::RbacService;
 use crate::middleware::permission::PermissionAuth;
+use serde::Serialize;
 
 // --- Structs de Resposta Específicas --- 
 #[derive(Serialize)]
@@ -22,241 +14,213 @@ struct PermissionCheckResponse {
     has_permission: bool,
 }
 
-// --- Handlers de Permissão ---
+// --- Funções Handler para Permissões ---
 
 #[post("/permissions")]
-async fn create_permission(
-    pool: Data<DbPool>,
-    permission_data: Json<CreatePermissionDto>,
-    _user: AuthenticatedUser,
-) -> Result<HttpResponse, ApiError> {
-    let dto = permission_data.into_inner();
-    dto.validate()?;
-    let new_permission = RbacService::create_permission(&pool, dto)?;
-    Ok(HttpResponse::Created().json(new_permission))
+pub async fn create_permission_handler(
+    rbac_service: web::Data<RbacService>, // Receber RbacService
+    dto: web::Json<CreatePermissionDto>
+) -> ActixResult<impl Responder> {
+    let new_permission = rbac_service.create_permission(dto.into_inner())?; // Chamar método na instância
+    Ok(web::Json(new_permission))
 }
 
 #[get("/permissions")]
-async fn list_permissions(
-    pool: Data<DbPool>,
-     _user: AuthenticatedUser,
-) -> Result<Json<Vec<Permission>>, ApiError> {
-    let permissions = RbacService::list_permissions(&pool)?;
-    Ok(Json(permissions))
+pub async fn list_permissions_handler(
+    rbac_service: web::Data<RbacService> // Receber RbacService
+) -> ActixResult<impl Responder> {
+    let permissions = rbac_service.list_permissions()?; // Chamar método na instância
+    Ok(web::Json(permissions))
 }
 
-#[get("/permissions/{id}")]
-async fn get_permission_by_id(
-    pool: Data<DbPool>,
-    path: Path<String>,
-     _user: AuthenticatedUser,
-) -> Result<Json<Permission>, ApiError> {
+#[get("/permissions/id/{permission_id}")]
+pub async fn get_permission_by_id_handler(
+    rbac_service: web::Data<RbacService>, // Receber RbacService
+    path: web::Path<String> // Renomear para clareza se desejar
+) -> ActixResult<impl Responder> {
     let permission_id = path.into_inner();
-    let permission = RbacService::get_permission_by_id(&pool, &permission_id)?;
-    Ok(Json(permission))
+    let permission = rbac_service.get_permission_by_id(&permission_id)?; // Chamar método na instância
+    Ok(web::Json(permission))
 }
 
-#[get("/permissions/by-name/{name}")]
-async fn get_permission_by_name(
-    pool: Data<DbPool>,
-    path: Path<String>,
-     _user: AuthenticatedUser,
-) -> Result<Json<Permission>, ApiError> {
+#[get("/permissions/name/{permission_name}")]
+pub async fn get_permission_by_name_handler(
+    rbac_service: web::Data<RbacService>, // Receber RbacService
+    path: web::Path<String>
+) -> ActixResult<impl Responder> {
     let permission_name = path.into_inner();
-    let permission = RbacService::get_permission_by_name(&pool, &permission_name)?;
-    Ok(Json(permission))
+    let permission = rbac_service.get_permission_by_name(&permission_name)?; // Chamar método na instância
+    Ok(web::Json(permission))
 }
 
-#[put("/permissions/{id}")]
-async fn update_permission(
-    pool: Data<DbPool>,
-    path: Path<String>,
-    permission_data: Json<UpdatePermissionDto>,
-    _user: AuthenticatedUser,
-) -> Result<Json<Permission>, ApiError> {
-    let dto = permission_data.into_inner();
-    dto.validate()?;
+#[put("/permissions/{permission_id}")]
+pub async fn update_permission_handler(
+    rbac_service: web::Data<RbacService>, // Receber RbacService
+    path: web::Path<String>,
+    dto: web::Json<UpdatePermissionDto>
+) -> ActixResult<impl Responder> {
     let permission_id = path.into_inner();
-    let updated_permission =
-        RbacService::update_permission(&pool, &permission_id, dto)?;
-    Ok(Json(updated_permission))
+    let updated_permission = rbac_service.update_permission(&permission_id, dto.into_inner())?; // Chamar método
+    Ok(web::Json(updated_permission))
 }
 
-#[delete("/permissions/{id}")]
-async fn delete_permission(
-    pool: Data<DbPool>,
-    path: Path<String>,
-    _user: AuthenticatedUser,
-) -> Result<HttpResponse, ApiError> {
+#[delete("/permissions/{permission_id}")]
+pub async fn delete_permission_handler(
+    rbac_service: web::Data<RbacService>, // Receber RbacService
+    path: web::Path<String>
+) -> ActixResult<impl Responder> {
     let permission_id = path.into_inner();
-    RbacService::delete_permission(&pool, &permission_id)?;
-    Ok(HttpResponse::NoContent().finish())
+    rbac_service.delete_permission(&permission_id)?; // Chamar método
+    Ok(HttpResponse::Ok().finish()) // Retornar 200 OK sem corpo
 }
 
-// --- Handlers de Papel ---
+// --- Funções Handler para Papéis (Roles) ---
 
 #[post("/roles")]
-async fn create_role(
-    pool: Data<DbPool>,
-    role_data: Json<CreateRoleDto>,
-    _user: AuthenticatedUser,
-) -> Result<HttpResponse, ApiError> {
-    let dto = role_data.into_inner();
-    dto.validate()?;
-    let new_role = RbacService::create_role(&pool, dto)?;
-    Ok(HttpResponse::Created().json(new_role))
+pub async fn create_role_handler(
+    rbac_service: web::Data<RbacService>, // Receber RbacService
+    dto: web::Json<CreateRoleDto>
+) -> ActixResult<impl Responder> {
+    let new_role = rbac_service.create_role(dto.into_inner())?; // Chamar método
+    Ok(web::Json(new_role))
 }
 
 #[get("/roles")]
-async fn list_roles(
-    pool: Data<DbPool>,
-    _user: AuthenticatedUser,
-) -> Result<Json<Vec<Role>>, ApiError> {
-    let roles = RbacService::list_roles(&pool)?;
-    Ok(Json(roles))
+pub async fn list_roles_handler(
+    rbac_service: web::Data<RbacService> // Receber RbacService
+) -> ActixResult<impl Responder> {
+    let roles = rbac_service.list_roles()?; // Chamar método
+    Ok(web::Json(roles))
 }
 
-#[get("/roles/{id}")]
-async fn get_role_by_id(
-    pool: Data<DbPool>,
-    path: Path<String>,
-    _user: AuthenticatedUser,
-) -> Result<Json<Role>, ApiError> {
+#[get("/roles/id/{role_id}")]
+pub async fn get_role_by_id_handler(
+    rbac_service: web::Data<RbacService>, // Receber RbacService
+    path: web::Path<String>
+) -> ActixResult<impl Responder> {
     let role_id = path.into_inner();
-    let role = RbacService::get_role_by_id(&pool, &role_id)?;
-    Ok(Json(role))
+    let role = rbac_service.get_role_by_id(&role_id)?; // Chamar método
+    Ok(web::Json(role))
 }
 
-#[get("/roles/by-name/{name}")]
-async fn get_role_by_name(
-    pool: Data<DbPool>,
-    path: Path<String>,
-    _user: AuthenticatedUser,
-) -> Result<Json<Role>, ApiError> {
+#[get("/roles/name/{role_name}")]
+pub async fn get_role_by_name_handler(
+    rbac_service: web::Data<RbacService>, // Receber RbacService
+    path: web::Path<String>
+) -> ActixResult<impl Responder> {
     let role_name = path.into_inner();
-    let role = RbacService::get_role_by_name(&pool, &role_name)?;
-    Ok(Json(role))
+    let role = rbac_service.get_role_by_name(&role_name)?; // Chamar método
+    Ok(web::Json(role))
 }
 
-#[put("/roles/{id}")]
-async fn update_role(
-    pool: Data<DbPool>,
-    path: Path<String>,
-    role_data: Json<UpdateRoleDto>,
-    _user: AuthenticatedUser,
-) -> Result<Json<Role>, ApiError> {
-    let dto = role_data.into_inner();
-    dto.validate()?;
+#[put("/roles/{role_id}")]
+pub async fn update_role_handler(
+    rbac_service: web::Data<RbacService>, // Receber RbacService
+    path: web::Path<String>,
+    dto: web::Json<UpdateRoleDto>
+) -> ActixResult<impl Responder> {
     let role_id = path.into_inner();
-    let updated_role = RbacService::update_role(&pool, &role_id, dto)?;
-    Ok(Json(updated_role))
+    // update_role agora retorna Result<(), ApiError>
+    rbac_service.update_role(&role_id, dto.into_inner())?; // Chamar método
+    // Retornar 200 OK sem corpo ou buscar o papel atualizado e retorná-lo
+    // Opção 1: Retornar Ok sem corpo
+    Ok(HttpResponse::Ok().finish())
+    // Opção 2: Buscar e retornar (requer chamada extra)
+    // let updated_role = rbac_service.get_role_by_id(&role_id)?;
+    // Ok(web::Json(updated_role))
 }
 
-#[delete("/roles/{id}")]
-async fn delete_role(
-    pool: Data<DbPool>,
-    path: Path<String>,
-    _user: AuthenticatedUser,
-) -> Result<HttpResponse, ApiError> {
+#[delete("/roles/{role_id}")]
+pub async fn delete_role_handler(
+    rbac_service: web::Data<RbacService>, // Receber RbacService
+    path: web::Path<String>
+) -> ActixResult<impl Responder> {
     let role_id = path.into_inner();
-    RbacService::delete_role(&pool, &role_id)?;
-    Ok(HttpResponse::NoContent().finish())
+    rbac_service.delete_role(&role_id)?; // Chamar método
+    Ok(HttpResponse::Ok().finish()) // Retornar 200 OK sem corpo
 }
 
-// --- Handlers de Associação ---
-
-// -- Papel <-> Permissão --
+// --- Funções Handler para Associações ---
 
 #[post("/roles/{role_id}/permissions/{permission_id}")]
-async fn assign_permission_to_role_handler(
-    pool: Data<DbPool>,
-    path: Path<(String, String)>,
-    _user: AuthenticatedUser,
-) -> Result<HttpResponse, ApiError> {
+pub async fn assign_permission_to_role_handler(
+    rbac_service: web::Data<RbacService>, // Receber RbacService
+    path: web::Path<(String, String)>
+) -> ActixResult<impl Responder> {
     let (role_id, permission_id) = path.into_inner();
-    RbacService::assign_permission_to_role(&pool, &role_id, &permission_id)?;
-    Ok(HttpResponse::Ok().finish()) // Ou NoContent
+    rbac_service.assign_permission_to_role(&role_id, &permission_id)?; // Chamar método
+    Ok(HttpResponse::Ok().finish())
 }
 
 #[delete("/roles/{role_id}/permissions/{permission_id}")]
-async fn revoke_permission_from_role_handler(
-    pool: Data<DbPool>,
-    path: Path<(String, String)>,
-    _user: AuthenticatedUser,
-) -> Result<HttpResponse, ApiError> {
+pub async fn revoke_permission_from_role_handler(
+    rbac_service: web::Data<RbacService>, // Receber RbacService
+    path: web::Path<(String, String)>
+) -> ActixResult<impl Responder> {
     let (role_id, permission_id) = path.into_inner();
-    RbacService::revoke_permission_from_role(&pool, &role_id, &permission_id)?;
-    Ok(HttpResponse::NoContent().finish())
+    rbac_service.revoke_permission_from_role(&role_id, &permission_id)?; // Chamar método
+    Ok(HttpResponse::Ok().finish())
 }
 
 #[get("/roles/{role_id}/permissions")]
-async fn get_role_permissions_handler(
-    pool: Data<DbPool>,
-    path: Path<String>,
-    _user: AuthenticatedUser,
-) -> Result<Json<Vec<Permission>>, ApiError> {
+pub async fn get_role_permissions_handler(
+    rbac_service: web::Data<RbacService>, // Receber RbacService
+    path: web::Path<String>
+) -> ActixResult<impl Responder> {
     let role_id = path.into_inner();
-    let permissions = RbacService::get_role_permissions(&pool, &role_id)?;
-    Ok(Json(permissions))
+    let permissions = rbac_service.get_role_permissions(&role_id)?; // Chamar método
+    Ok(web::Json(permissions))
 }
 
-// -- Usuário <-> Papel --
-
 #[post("/users/{user_id}/roles/{role_id}")]
-async fn assign_role_to_user_handler(
-    pool: Data<DbPool>,
-    path: Path<(String, String)>,
-    _user: AuthenticatedUser,
-) -> Result<HttpResponse, ApiError> {
+pub async fn assign_role_to_user_handler(
+    rbac_service: web::Data<RbacService>, // Receber RbacService
+    path: web::Path<(String, String)>
+) -> ActixResult<impl Responder> {
     let (user_id, role_id) = path.into_inner();
-    RbacService::assign_role_to_user(&pool, &user_id, &role_id)?;
-    Ok(HttpResponse::Ok().finish()) // Ou NoContent
+    rbac_service.assign_role_to_user(&user_id, &role_id)?; // Chamar método
+    Ok(HttpResponse::Ok().finish())
 }
 
 #[delete("/users/{user_id}/roles/{role_id}")]
-async fn revoke_role_from_user_handler(
-    pool: Data<DbPool>,
-    path: Path<(String, String)>,
-    _user: AuthenticatedUser,
-) -> Result<HttpResponse, ApiError> {
+pub async fn revoke_role_from_user_handler(
+    rbac_service: web::Data<RbacService>, // Receber RbacService
+    path: web::Path<(String, String)>
+) -> ActixResult<impl Responder> {
     let (user_id, role_id) = path.into_inner();
-    RbacService::revoke_role_from_user(&pool, &user_id, &role_id)?;
-    Ok(HttpResponse::NoContent().finish())
+    rbac_service.revoke_role_from_user(&user_id, &role_id)?; // Chamar método
+    Ok(HttpResponse::Ok().finish())
 }
 
 #[get("/users/{user_id}/roles")]
-async fn get_user_roles_handler(
-    pool: Data<DbPool>,
-    path: Path<String>,
-    _user: AuthenticatedUser,
-) -> Result<Json<Vec<Role>>, ApiError> {
+pub async fn get_user_roles_handler(
+    rbac_service: web::Data<RbacService>, // Receber RbacService
+    path: web::Path<String>
+) -> ActixResult<impl Responder> {
     let user_id = path.into_inner();
-    let roles = RbacService::get_user_roles(&pool, &user_id)?;
-    Ok(Json(roles))
+    let roles = rbac_service.get_user_roles(&user_id)?; // Chamar método
+    Ok(web::Json(roles))
 }
 
-// --- Handlers de Verificação ---
-
-#[get("/check-permission/{user_id}/{permission_name}")]
-async fn check_user_permission_handler(
-    pool: Data<DbPool>,
-    path: Path<(String, String)>,
-    _user: AuthenticatedUser,
-) -> Result<Json<PermissionCheckResponse>, ApiError> {
+#[get("/users/{user_id}/permissions/{permission_name}/check")]
+pub async fn check_user_permission_handler(
+    rbac_service: web::Data<RbacService>, // Receber RbacService
+    path: web::Path<(String, String)>
+) -> ActixResult<impl Responder> {
     let (user_id, permission_name) = path.into_inner();
-    let has_permission = RbacService::check_user_permission(&pool, &user_id, &permission_name)?;
-    Ok(Json(PermissionCheckResponse { has_permission }))
+    let has_permission = rbac_service.check_user_permission(&user_id, &permission_name)?; // Chamar método
+    Ok(web::Json(serde_json::json!({ "has_permission": has_permission })))
 }
 
 // Função para configurar o escopo das rotas RBAC
 pub fn configure_rbac_routes(cfg: &mut web::ServiceConfig) {
     // Rotas de Leitura (acessíveis a usuários autenticados - sem wrap adicional aqui)
-    cfg.service(list_permissions);
-    cfg.service(get_permission_by_id);
-    cfg.service(get_permission_by_name);
-    cfg.service(list_roles);
-    cfg.service(get_role_by_id);
-    cfg.service(get_role_by_name);
+    cfg.service(list_permissions_handler);
+    cfg.service(get_permission_by_id_handler);
+    cfg.service(get_permission_by_name_handler);
+    cfg.service(list_roles_handler);
+    cfg.service(get_role_by_id_handler);
+    cfg.service(get_role_by_name_handler);
     cfg.service(get_role_permissions_handler);
     cfg.service(get_user_roles_handler);
     cfg.service(check_user_permission_handler);
@@ -268,18 +232,18 @@ pub fn configure_rbac_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/permissions") // Escopo para permissões
             .wrap(PermissionAuth::new("permissions:manage")) // Requer permissão
-            .service(create_permission)
-            .service(update_permission)
-            .service(delete_permission)
+            .service(create_permission_handler)
+            .service(update_permission_handler)
+            .service(delete_permission_handler)
     );
 
     // Gerenciamento de Papéis
     cfg.service(
         web::scope("/roles") // Escopo para papéis
             .wrap(PermissionAuth::new("roles:manage")) // Requer permissão
-            .service(create_role)
-            .service(update_role)
-            .service(delete_role)
+            .service(create_role_handler)
+            .service(update_role_handler)
+            .service(delete_role_handler)
     );
 
     // Associações Papel <-> Permissão
