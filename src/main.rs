@@ -97,7 +97,7 @@ async fn main() -> std::io::Result<()> {
     info!("✅ Serviço RBAC inicializado com sucesso");
 
     // Inicializa o serviço de perguntas de segurança
-    let security_question_repo = services::security_question_service::SqliteSecurityQuestionRepository::new();
+    let security_question_repo = repositories::security_question_repository::SqliteSecurityQuestionRepository::new(pool.clone());
     let security_question_service = services::security_question_service::SecurityQuestionService::new(security_question_repo);
     info!("✅ Serviço de perguntas de segurança inicializado com sucesso");
 

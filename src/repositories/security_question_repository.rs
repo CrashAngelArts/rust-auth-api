@@ -1,233 +1,289 @@
-use anyhow::Result;
 use chrono::Utc;
-use rusqlite::{params, Connection, Row};
+use rusqlite::{params, Row};
 use uuid::Uuid;
 
-use crate::errors::app_error::AppError;
 use crate::models::security_question::{SecurityQuestion, UserSecurityAnswer};
+use crate::db::DbPool;
+use crate::errors::ApiError;
 
+#[derive(Clone)]
 pub struct SqliteSecurityQuestionRepository {
-    conn: Connection,
+    pool: DbPool,
 }
 
 impl SqliteSecurityQuestionRepository {
-    pub fn new(conn: Connection) -> Self {
-        Self { conn }
+    pub fn new(pool: DbPool) -> Self {
+        Self { pool }
     }
 
     // ----- Métodos para SecurityQuestion -----
 
-    pub fn create_security_question(&self, text: String) -> Result<SecurityQuestion> {
-        let security_question = SecurityQuestion::new(text);
+    pub fn create_security_question(&self, text: String) -> Result<SecurityQuestion, ApiError> {
+        let conn = self.pool.get()?;
         
-        self.conn.execute(
+        let question = SecurityQuestion {
+            id: Uuid::new_v4(),
+            text,
+            active: true,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        
+        conn.execute(
             "INSERT INTO security_questions (id, text, active, created_at, updated_at) 
              VALUES (?1, ?2, ?3, ?4, ?5)",
             params![
-                security_question.id.to_string(),
-                security_question.text,
-                security_question.active,
-                security_question.created_at,
-                security_question.updated_at,
+                &question.id.to_string(),
+                &question.text,
+                &question.active,
+                &question.created_at,
+                &question.updated_at
             ],
         )?;
-
-        Ok(security_question)
+        
+        Ok(question)
     }
 
-    pub fn get_security_question_by_id(&self, id: &Uuid) -> Result<SecurityQuestion> {
-        let mut stmt = self.conn.prepare(
+    pub fn get_security_question_by_id(&self, id: &Uuid) -> Result<SecurityQuestion, ApiError> {
+        let conn = self.pool.get()?;
+        
+        let question = conn.query_row(
             "SELECT id, text, active, created_at, updated_at 
              FROM security_questions 
              WHERE id = ?1",
+            [id.to_string()],
+            |row| {
+                let id_str: String = row.get(0)?;
+                Ok(SecurityQuestion {
+                    id: Uuid::parse_str(&id_str).unwrap_or_default(),
+                    text: row.get(1)?,
+                    active: row.get(2)?,
+                    created_at: row.get(3)?,
+                    updated_at: row.get(4)?,
+                })
+            },
         )?;
-
-        let security_question = stmt.query_row(params![id.to_string()], |row| {
-            self.map_row_to_security_question(row)
-        })?;
-
-        Ok(security_question)
+        
+        Ok(question)
     }
 
-    pub fn list_security_questions(&self, only_active: bool) -> Result<Vec<SecurityQuestion>> {
-        let sql = if only_active {
-            "SELECT id, text, active, created_at, updated_at 
-             FROM security_questions 
-             WHERE active = TRUE 
-             ORDER BY text"
+    pub fn list_security_questions(&self, only_active: bool) -> Result<Vec<SecurityQuestion>, ApiError> {
+        let conn = self.pool.get()?;
+        
+        let mut stmt = if only_active {
+            conn.prepare(
+                "SELECT id, text, active, created_at, updated_at 
+                 FROM security_questions 
+                 WHERE active = 1 
+                 ORDER BY created_at"
+            )?
         } else {
-            "SELECT id, text, active, created_at, updated_at 
-             FROM security_questions 
-             ORDER BY text"
+            conn.prepare(
+                "SELECT id, text, active, created_at, updated_at 
+                 FROM security_questions 
+                 ORDER BY created_at"
+            )?
         };
-
-        let mut stmt = self.conn.prepare(sql)?;
-        let security_question_iter = stmt.query_map([], |row| {
-            self.map_row_to_security_question(row)
+        
+        let question_iter = stmt.query_map([], |row| {
+            let id_str: String = row.get(0)?;
+            Ok(SecurityQuestion {
+                id: Uuid::parse_str(&id_str).unwrap_or_default(),
+                text: row.get(1)?,
+                active: row.get(2)?,
+                created_at: row.get(3)?,
+                updated_at: row.get(4)?,
+            })
         })?;
-
-        let mut security_questions = Vec::new();
-        for security_question in security_question_iter {
-            security_questions.push(security_question?);
+        
+        let mut questions = Vec::new();
+        for question in question_iter {
+            questions.push(question?);
         }
-
-        Ok(security_questions)
+        
+        Ok(questions)
     }
 
-    pub fn update_security_question(&self, security_question: &mut SecurityQuestion) -> Result<()> {
-        security_question.updated_at = Utc::now();
-
-        self.conn.execute(
+    pub fn update_security_question(&self, question: &mut SecurityQuestion) -> Result<(), ApiError> {
+        let conn = self.pool.get()?;
+        
+        question.updated_at = Utc::now();
+        
+        conn.execute(
             "UPDATE security_questions 
-             SET text = ?2, active = ?3, updated_at = ?4 
-             WHERE id = ?1",
+             SET text = ?1, active = ?2, updated_at = ?3 
+             WHERE id = ?4",
             params![
-                security_question.id.to_string(),
-                security_question.text,
-                security_question.active,
-                security_question.updated_at,
+                &question.text,
+                &question.active,
+                &question.updated_at,
+                &question.id.to_string()
             ],
         )?;
-
+        
         Ok(())
     }
 
-    pub fn delete_security_question(&self, id: &Uuid) -> Result<()> {
-        // Primeiro verifica se a pergunta está sendo usada
-        let mut stmt = self.conn.prepare(
-            "SELECT COUNT(*) FROM user_security_answers WHERE question_id = ?1"
-        )?;
+    pub fn delete_security_question(&self, id: &Uuid) -> Result<(), ApiError> {
+        let conn = self.pool.get()?;
         
-        let count: i64 = stmt.query_row(params![id.to_string()], |row| row.get(0))?;
+        // Verificar se existem respostas para esta pergunta
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM user_security_answers WHERE question_id = ?1",
+            [id.to_string()],
+            |row| row.get(0),
+        )?;
         
         if count > 0 {
-            return Err(AppError::ConstraintViolation(
-                "Não é possível excluir uma pergunta de segurança que está em uso 🔒".to_string()
-            ).into());
+            return Err(ApiError::ConflictError(
+                "Esta pergunta de segurança tem respostas associadas e não pode ser excluída 🚫".to_string()
+            ));
         }
-
-        self.conn.execute(
+        
+        conn.execute(
             "DELETE FROM security_questions WHERE id = ?1",
-            params![id.to_string()],
+            [id.to_string()],
         )?;
-
+        
         Ok(())
     }
 
     // ----- Métodos para UserSecurityAnswer -----
 
-    pub fn create_user_answer(
-        &self, 
-        user_id: &Uuid, 
-        question_id: &Uuid, 
-        answer_hash: String
-    ) -> Result<UserSecurityAnswer> {
-        let user_answer = UserSecurityAnswer::new(*user_id, *question_id, answer_hash);
+    pub fn create_user_answer(&self, user_id: &Uuid, question_id: &Uuid, answer_hash: String) -> Result<(), ApiError> {
+        let conn = self.pool.get()?;
+        let now = Utc::now();
+        let id = Uuid::new_v4();
         
-        self.conn.execute(
+        conn.execute(
             "INSERT INTO user_security_answers (id, user_id, question_id, answer_hash, created_at, updated_at) 
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
-                user_answer.id.to_string(),
-                user_answer.user_id.to_string(),
-                user_answer.question_id.to_string(),
-                user_answer.answer_hash,
-                user_answer.created_at,
-                user_answer.updated_at,
+                &id.to_string(),
+                &user_id.to_string(),
+                &question_id.to_string(),
+                &answer_hash,
+                &now,
+                &now
             ],
         )?;
-
-        Ok(user_answer)
+        
+        Ok(())
     }
 
-    pub fn get_user_answers(&self, user_id: &Uuid) -> Result<Vec<UserSecurityAnswer>> {
-        let mut stmt = self.conn.prepare(
+    pub fn get_user_answer(&self, user_id: &Uuid, question_id: &Uuid) -> Result<UserSecurityAnswer, ApiError> {
+        let conn = self.pool.get()?;
+        
+        let answer = conn.query_row(
             "SELECT id, user_id, question_id, answer_hash, created_at, updated_at 
              FROM user_security_answers 
-             WHERE user_id = ?1
-             ORDER BY created_at"
+             WHERE user_id = ?1 AND question_id = ?2",
+            params![
+                &user_id.to_string(),
+                &question_id.to_string()
+            ],
+            |row| {
+                let id_str: String = row.get(0)?;
+                let user_id_str: String = row.get(1)?;
+                let question_id_str: String = row.get(2)?;
+                
+                Ok(UserSecurityAnswer {
+                    id: Uuid::parse_str(&id_str).unwrap_or_default(),
+                    user_id: Uuid::parse_str(&user_id_str).unwrap_or_default(),
+                    question_id: Uuid::parse_str(&question_id_str).unwrap_or_default(),
+                    answer_hash: row.get(3)?,
+                    created_at: row.get(4)?,
+                    updated_at: row.get(5)?,
+                })
+            },
         )?;
+        
+        Ok(answer)
+    }
 
-        let answer_iter = stmt.query_map(params![user_id.to_string()], |row| {
-            self.map_row_to_user_answer(row)
+    pub fn get_user_answers(&self, user_id: &Uuid) -> Result<Vec<UserSecurityAnswer>, ApiError> {
+        let conn = self.pool.get()?;
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, user_id, question_id, answer_hash, created_at, updated_at 
+             FROM user_security_answers 
+             WHERE user_id = ?1"
+        )?;
+        
+        let answer_iter = stmt.query_map([user_id.to_string()], |row| {
+            let id_str: String = row.get(0)?;
+            let user_id_str: String = row.get(1)?;
+            let question_id_str: String = row.get(2)?;
+            
+            Ok(UserSecurityAnswer {
+                id: Uuid::parse_str(&id_str).unwrap_or_default(),
+                user_id: Uuid::parse_str(&user_id_str).unwrap_or_default(),
+                question_id: Uuid::parse_str(&question_id_str).unwrap_or_default(),
+                answer_hash: row.get(3)?,
+                created_at: row.get(4)?,
+                updated_at: row.get(5)?,
+            })
         })?;
-
+        
         let mut answers = Vec::new();
         for answer in answer_iter {
             answers.push(answer?);
         }
-
+        
         Ok(answers)
     }
 
-    pub fn get_user_answer(
-        &self, 
-        user_id: &Uuid, 
-        question_id: &Uuid
-    ) -> Result<UserSecurityAnswer> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, user_id, question_id, answer_hash, created_at, updated_at 
-             FROM user_security_answers 
-             WHERE user_id = ?1 AND question_id = ?2"
-        )?;
-
-        let answer = stmt.query_row(
-            params![user_id.to_string(), question_id.to_string()], 
-            |row| self.map_row_to_user_answer(row)
-        )?;
-
-        Ok(answer)
-    }
-
-    pub fn update_user_answer(
-        &self, 
-        user_answer: &mut UserSecurityAnswer
-    ) -> Result<()> {
-        user_answer.updated_at = Utc::now();
-
-        self.conn.execute(
+    pub fn update_user_answer(&self, answer: &mut UserSecurityAnswer) -> Result<(), ApiError> {
+        let conn = self.pool.get()?;
+        
+        answer.updated_at = Utc::now();
+        
+        conn.execute(
             "UPDATE user_security_answers 
-             SET answer_hash = ?3, updated_at = ?4 
-             WHERE user_id = ?1 AND question_id = ?2",
+             SET answer_hash = ?1, updated_at = ?2 
+             WHERE id = ?3",
             params![
-                user_answer.user_id.to_string(),
-                user_answer.question_id.to_string(),
-                user_answer.answer_hash,
-                user_answer.updated_at,
+                &answer.answer_hash,
+                &answer.updated_at,
+                &answer.id.to_string()
             ],
         )?;
-
+        
         Ok(())
     }
 
-    pub fn delete_user_answer(
-        &self, 
-        user_id: &Uuid, 
-        question_id: &Uuid
-    ) -> Result<()> {
-        self.conn.execute(
+    pub fn delete_user_answer(&self, user_id: &Uuid, question_id: &Uuid) -> Result<(), ApiError> {
+        let conn = self.pool.get()?;
+        
+        conn.execute(
             "DELETE FROM user_security_answers 
              WHERE user_id = ?1 AND question_id = ?2",
-            params![user_id.to_string(), question_id.to_string()],
+            params![
+                &user_id.to_string(),
+                &question_id.to_string()
+            ],
         )?;
-
+        
         Ok(())
     }
 
-    pub fn delete_all_user_answers(&self, user_id: &Uuid) -> Result<()> {
-        self.conn.execute(
+    pub fn delete_all_user_answers(&self, user_id: &Uuid) -> Result<(), ApiError> {
+        let conn = self.pool.get()?;
+        
+        conn.execute(
             "DELETE FROM user_security_answers WHERE user_id = ?1",
-            params![user_id.to_string()],
+            [user_id.to_string()],
         )?;
-
+        
         Ok(())
     }
 
     // ----- Métodos auxiliares -----
 
     fn map_row_to_security_question(&self, row: &Row) -> Result<SecurityQuestion, rusqlite::Error> {
+        let id_str: String = row.get(0)?;
         Ok(SecurityQuestion {
-            id: Uuid::parse_str(row.get(0)?).unwrap(),
+            id: Uuid::parse_str(&id_str).unwrap(),
             text: row.get(1)?,
             active: row.get(2)?,
             created_at: row.get(3)?,
@@ -236,10 +292,14 @@ impl SqliteSecurityQuestionRepository {
     }
 
     fn map_row_to_user_answer(&self, row: &Row) -> Result<UserSecurityAnswer, rusqlite::Error> {
+        let id_str: String = row.get(0)?;
+        let user_id_str: String = row.get(1)?;
+        let question_id_str: String = row.get(2)?;
+        
         Ok(UserSecurityAnswer {
-            id: Uuid::parse_str(row.get(0)?).unwrap(),
-            user_id: Uuid::parse_str(row.get(1)?).unwrap(),
-            question_id: Uuid::parse_str(row.get(2)?).unwrap(),
+            id: Uuid::parse_str(&id_str).unwrap(),
+            user_id: Uuid::parse_str(&user_id_str).unwrap(),
+            question_id: Uuid::parse_str(&question_id_str).unwrap(),
             answer_hash: row.get(3)?,
             created_at: row.get(4)?,
             updated_at: row.get(5)?,

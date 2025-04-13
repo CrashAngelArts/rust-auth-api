@@ -1,12 +1,11 @@
 use crate::config::Config;
 use crate::db::DbPool;
 use crate::errors::ApiError;
-use crate::middleware::auth::{AdminAuth, AuthenticatedUser};
-use crate::models::auth::TokenClaims;
+use crate::middleware::auth::AuthenticatedUser;
 use crate::models::response::{ApiResponse, PaginatedResponse};
 use crate::models::user::{ChangePasswordDto, UpdateUserDto, UserResponse};
 use crate::services::user_service::UserService;
-use actix_web::{web, HttpMessage, HttpRequest, HttpResponse, Responder, post};
+use actix_web::{web, HttpRequest, HttpResponse, Responder, post};
 use serde::Deserialize;
 use validator::Validate;
 

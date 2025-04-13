@@ -7,67 +7,7 @@ use argon2::{
 };
 
 use crate::models::security_question::{SecurityQuestion, UserSecurityAnswer};
-
-// Stub temporário até que o repositório real seja implementado
-#[derive(Clone)]
-pub struct SqliteSecurityQuestionRepository;
-
-impl SqliteSecurityQuestionRepository {
-    pub fn new() -> Self {
-        Self {}
-    }
-    
-    pub fn create_security_question(&self, text: String) -> Result<SecurityQuestion, ApiError> {
-        Ok(SecurityQuestion {
-            id: Uuid::new_v4(),
-            text,
-            active: true,
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
-        })
-    }
-    
-    pub fn get_security_question_by_id(&self, _id: &Uuid) -> Result<SecurityQuestion, ApiError> {
-        Err(ApiError::NotFound("Pergunta de segurança não encontrada 🔍".to_string()))
-    }
-    
-    pub fn list_security_questions(&self, _only_active: bool) -> Result<Vec<SecurityQuestion>, ApiError> {
-        Ok(Vec::new())
-    }
-    
-    pub fn update_security_question(&self, question: &mut SecurityQuestion) -> Result<(), ApiError> {
-        question.updated_at = chrono::Utc::now();
-        Ok(())
-    }
-    
-    pub fn delete_security_question(&self, _id: &Uuid) -> Result<(), ApiError> {
-        Ok(())
-    }
-    
-    pub fn get_user_answer(&self, _user_id: &Uuid, _question_id: &Uuid) -> Result<UserSecurityAnswer, ApiError> {
-        Err(ApiError::NotFound("Resposta de segurança não encontrada 🔍".to_string()))
-    }
-    
-    pub fn get_user_answers(&self, _user_id: &Uuid) -> Result<Vec<UserSecurityAnswer>, ApiError> {
-        Ok(Vec::new())
-    }
-    
-    pub fn create_user_answer(&self, _user_id: &Uuid, _question_id: &Uuid, _answer_hash: String) -> Result<(), ApiError> {
-        Ok(())
-    }
-    
-    pub fn update_user_answer(&self, _answer: &mut UserSecurityAnswer) -> Result<(), ApiError> {
-        Ok(())
-    }
-    
-    pub fn delete_user_answer(&self, _user_id: &Uuid, _question_id: &Uuid) -> Result<(), ApiError> {
-        Ok(())
-    }
-    
-    pub fn delete_all_user_answers(&self, _user_id: &Uuid) -> Result<(), ApiError> {
-        Ok(())
-    }
-}
+use crate::repositories::security_question_repository::SqliteSecurityQuestionRepository;
 
 /// Serviço para gerenciar perguntas de segurança e respostas dos usuários
 #[derive(Clone)]

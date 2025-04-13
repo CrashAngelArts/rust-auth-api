@@ -12,7 +12,7 @@ use crate::services::security_question_service::SecurityQuestionService; // Impo
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use tracing::{error, warn};
 use validator::Validate;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 
 // Novos DTOs para perguntas de segurança na recuperação de senha

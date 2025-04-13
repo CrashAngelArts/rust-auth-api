@@ -8,7 +8,6 @@ use rusqlite::params;
 use tracing::{info, warn, error};
 use woothee::parser::Parser;
 use serde_json;
-use std::time::SystemTime;
 
 pub struct DeviceService;
 
