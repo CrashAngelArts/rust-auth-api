@@ -10,6 +10,7 @@ use crate::controllers::{
     device_controller, // Novo controlador de gerenciamento de dispositivos 📱
     recovery_email_controller, // Novo controlador de emails de recuperação 📧
     oauth_controller, // Novo controlador de autenticação OAuth 🔑
+    rbac_controller, // <-- Adicionar import para rbac_controller
 };
 use crate::middleware::{
     auth::{AdminAuth, JwtAuth},
@@ -188,6 +189,12 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
                     .route("/clean-tokens", web::post().to(token_controller::clean_expired_tokens))
                     .route("/clean-verification-codes", web::post().to(email_verification_controller::clean_expired_codes))
                     .route("/clean-sessions", web::post().to(device_controller::clean_expired_sessions)),
+            )
+            // Adicionar o escopo para RBAC
+            .service(
+                web::scope("/rbac") // Criar um escopo interno para aplicar o wrap
+                    .wrap(jwt_auth.clone()) // Aplicar JwtAuth a todas as rotas /api/rbac
+                    .configure(rbac_controller::configure_rbac_routes) // Usar .configure para registrar as rotas
             ),
     )
     .service(

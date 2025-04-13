@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
+use validator::Validate;
 
 /// Representa uma permissão granular no sistema.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)] // Adicionado Hash para uso em Sets/Maps
@@ -27,15 +28,17 @@ impl Permission {
 }
 
 /// Representa os dados para criar uma nova Permissão (DTO).
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct CreatePermissionDto {
+    #[validate(length(min = 1, message = "Nome da permissão não pode ser vazio."))]
     pub name: String,
     pub description: Option<String>,
 }
 
 /// Representa os dados para atualizar uma Permissão (DTO).
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct UpdatePermissionDto {
+    #[validate(length(min = 1, message = "Nome da permissão não pode ser vazio."))]
     pub name: Option<String>,
     pub description: Option<String>,
 } 

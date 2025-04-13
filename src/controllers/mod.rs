@@ -8,3 +8,4 @@ pub mod email_verification_controller;
 pub mod device_controller;
 pub mod recovery_email_controller;
 pub mod oauth_controller;
+pub mod rbac_controller;

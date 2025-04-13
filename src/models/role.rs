@@ -1,55 +1,49 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use super::permission::Permission; // Importa o modelo Permission
+use validator::Validate;
 
-/// Representa um papel (role) no sistema, que agrupa permissões.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+/// Representa um Papel (Role) no sistema RBAC.
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Role {
-    pub id: String,         // ID único (UUID)
-    pub name: String,       // Nome único do papel (ex: "admin", "editor")
-    pub description: Option<String>, // Descrição opcional
-
-    #[serde(skip_serializing_if = "Vec::is_empty", default)] // Não serializa se vazio, usa default
-    pub permissions: Vec<Permission>, // Lista de permissões associadas (preenchida sob demanda)
-
+    pub id: String, // UUID v7 como String
+    pub name: String,
+    pub description: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
 impl Role {
-    /// Cria uma nova instância de Role (sem permissões inicialmente).
+    /// Cria uma nova instância de Role.
     pub fn new(name: String, description: Option<String>) -> Self {
         let now = Utc::now();
-        Self {
-            id: Uuid::new_v4().to_string(),
+        Role {
+            id: Uuid::now_v7().to_string(), // Gera UUID v7
             name,
             description,
-            permissions: Vec::new(), // Começa sem permissões carregadas
             created_at: now,
             updated_at: now,
         }
     }
 }
 
-/// Representa os dados para criar um novo Papel (DTO).
-#[derive(Debug, Deserialize)]
+/// DTO para criar um novo Papel.
+#[derive(Debug, Deserialize, Validate)]
 pub struct CreateRoleDto {
+    #[validate(length(min = 3, message = "Nome do papel deve ter pelo menos 3 caracteres."))]
     pub name: String,
     pub description: Option<String>,
-    #[serde(default)] // Permite que o campo esteja ausente no JSON/Form
-    pub permission_ids: Vec<String>, // IDs das permissões a serem associadas
 }
 
-/// Representa os dados para atualizar um Papel (DTO).
-#[derive(Debug, Deserialize)]
+/// DTO para atualizar um Papel existente.
+#[derive(Debug, Deserialize, Validate)]
 pub struct UpdateRoleDto {
+    #[validate(length(min = 3, message = "Nome do papel deve ter pelo menos 3 caracteres."))]
     pub name: Option<String>,
-    pub description: Option<String>,
-    // Para atualizar permissões, geralmente se usa endpoints dedicados
-    // (ex: POST /roles/{id}/permissions, DELETE /roles/{id}/permissions/{perm_id})
-    // ou uma substituição completa:
-    pub permission_ids: Option<Vec<String>>, // Se presente, substitui todas as permissões
+    // A descrição pode ser atualizada para um novo valor ou não (se `None`).
+    // Para remover a descrição, envie `Some(None)` ou um campo nulo no JSON.
+    // O serviço tratará `None` como "não alterar".
+    pub description: Option<Option<String>>,
 }
 
 /// Representa os dados para associar/desassociar permissões a um papel.
