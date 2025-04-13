@@ -732,12 +732,7 @@ Configura rotas da API e middleware (incluindo CSRF e Rate Limiter).
 
 ## TODOs Pendentes
 
-Existem alguns TODOs pendentes no código que podem ser implementados no futuro:
-
-1. **Revogar tokens antigos antes de salvar um novo (AuthService)**:
-   * Em `src/services/auth_service.rs` na função `login()` - Funcionalidade opcional para revogar tokens antigos do usuário
-   * `// TODO: Opcional: Revogar tokens antigos antes de salvar o novo`
-   * Implementação comentada: `// Self::revoke_all_user_refresh_tokens(pool, &user.id)?;`
+Nenhum TODO pendente no momento! 🎉
 
 ## Melhorias Recentemente Implementadas
 
@@ -754,3 +749,8 @@ Existem alguns TODOs pendentes no código que podem ser implementados no futuro:
    * Em `src/services/auth_service.rs` na função `validate_token()`
    * Tokens agora são validados por audiência (quem deve aceitá-los) e emissor (quem os criou)
    * Configurados para "rust-auth-api-users" e "rust-auth-api" respectivamente
+
+4. **✅ Revogação automática de refresh tokens antigos no login**:
+   * Em `src/services/auth_service.rs` na função `login()`
+   * Agora, todos os refresh tokens antigos do usuário são revogados automaticamente quando um novo login é realizado
+   * Aumenta a segurança invalidando sessões anteriores

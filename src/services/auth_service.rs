@@ -212,8 +212,8 @@ impl AuthService {
         let mut refresh_token_db = RefreshToken::new(user.id.clone(), config.jwt.refresh_expiration_days);
         refresh_token_db.token_hash = refresh_token_hash; // Armazenar o hash
 
-        // TODO: Opcional: Revogar tokens antigos antes de salvar o novo
-        // Self::revoke_all_user_refresh_tokens(pool, &user.id)?;
+        // Revogar tokens de atualização antigos antes de salvar o novo
+        Self::revoke_all_user_refresh_tokens(pool, &user.id)?;
         Self::save_refresh_token(pool, &refresh_token_db)?; // Salvar o token com hash no DB
 
         // 9. Gera e envia código de verificação por email
