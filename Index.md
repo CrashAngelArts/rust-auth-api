@@ -275,16 +275,18 @@ Define estruturas de dados para permissões do RBAC.
 - `CreatePermissionDto`: DTO para criar uma nova permissão.
 - `UpdatePermissionDto`: DTO para atualizar uma permissão existente.
 
-#### role.rs - *TODO*
+#### role.rs
 Define estruturas de dados para papéis (roles) do RBAC.
 
 **Structs:**
-- `Role`: Representa um papel no sistema. (*TODO*)
-- `CreateRoleDto`: DTO para criar um novo papel. (*TODO*)
-- `UpdateRoleDto`: DTO para atualizar um papel existente. (*TODO*)
+- `Role`: Representa um papel no sistema com ID, nome, descrição e timestamps.
+- `CreateRoleDto`: DTO para criar um novo papel.
+- `UpdateRoleDto`: DTO para atualizar um papel existente.
+- `RolePermissionDto`: DTO para associar/desassociar permissões a um papel.
+- `UserRoleDto`: DTO para associar/desassociar papéis a um usuário.
 
-#### association.rs - *TODO*
-Define estruturas de dados para associações entre usuários, papéis e permissões. (*TODO*)
+**Methods:**
+- `Role::new()`: Cria uma nova instância de Role com UUID v7.
 
 #### user.rs
 Define estruturas de dados relacionadas ao usuário.
@@ -727,3 +729,26 @@ Configura rotas da API e middleware (incluindo CSRF e Rate Limiter).
 
 ---
 *Este índice foi gerado automaticamente e pode ser atualizado conforme o projeto evolui.*
+
+## TODOs Pendentes
+
+Existem alguns TODOs pendentes no código que podem ser implementados no futuro:
+
+1. **Revogar tokens antigos antes de salvar um novo (AuthService)**:
+   * Em `src/services/auth_service.rs` na função `login()` - Funcionalidade opcional para revogar tokens antigos do usuário
+   * `// TODO: Opcional: Revogar tokens antigos antes de salvar o novo`
+   * Implementação comentada: `// Self::revoke_all_user_refresh_tokens(pool, &user.id)?;`
+
+2. **Adicionar validação de audiência/issuer em tokens JWT (AuthService)**:
+   * Em `src/services/auth_service.rs` na função `validate_token()` 
+   * `let validation = Validation::default(); // TODO: Adicionar validação de audiência/issuer se necessário`
+
+3. **Verificar se o token está na blacklist durante validação (AuthService)**:
+   * Em `src/services/auth_service.rs` na função `validate_token()`
+   * `// TODO: Verificar se o token está na blacklist aqui`
+   * Exemplo de implementação sugerida: `// if is_token_blacklisted(pool, &token_data.claims.jti).await { return Err(...) }`
+
+4. **Atualizar módulos/funções deprecados em middleware/csrf.rs**:
+   * Substituir o uso de `ring::deprecated_constant_time::verify_slices_are_equal` com uma alternativa recomendada
+   * Mensagem: "Will be removed. Internal module not intended for external use, with no promises regarding side channels."
+   * Uma possível alternativa é implementar uma comparação de tempo constante personalizada ou usar uma biblioteca mais recente

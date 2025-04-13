@@ -8,12 +8,6 @@ use crate::services::rbac_service::RbacService;
 use crate::middleware::permission::PermissionAuth;
 use serde::Serialize;
 
-// --- Structs de Resposta Específicas --- 
-#[derive(Serialize)]
-struct PermissionCheckResponse {
-    has_permission: bool,
-}
-
 // --- Funções Handler para Permissões ---
 
 #[post("/permissions")]

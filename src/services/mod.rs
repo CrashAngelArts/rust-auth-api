@@ -11,8 +11,7 @@ pub mod recovery_email_service;
 pub mod oauth_service;
 pub mod rbac_service;
 
-// Re-exportar structs/enums públicos para facilitar o uso
-pub use auth_service::AuthService;
-pub use email_service::EmailService;
-pub use user_service::UserService;
+// Re-exportar structs/enums para facilitar imports externos
+// Estes exports são utilizados principalmente no main.rs e em outros módulos
+// Mantido para consistência e possível uso futuro
 pub use rbac_service::RbacService;
