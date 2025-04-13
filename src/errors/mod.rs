@@ -50,6 +50,16 @@ pub enum ApiError {
     
     #[error("Limite de taxa excedido: {0}")]
     RateLimited(ErrorResponse),
+
+    // Adicionando as variantes que estão faltando
+    #[error("Requisição inválida: {0}")]
+    BadRequest(String),
+
+    #[error("Recurso não encontrado: {0}")]
+    NotFound(String),
+
+    #[error("Atividade de login suspeita: {0}")]
+    SuspiciousLoginActivity(String),
 }
 
 // Conversão de erro de bloqueio do Actix
@@ -136,6 +146,7 @@ impl ResponseError for ApiError {
             ApiError::Forbidden(_) => StatusCode::FORBIDDEN,              // 403
             ApiError::TooManyRequests(_) => StatusCode::TOO_MANY_REQUESTS, // 429
             ApiError::RateLimited(_) => StatusCode::TOO_MANY_REQUESTS,    // 429
+            _ => StatusCode::INTERNAL_SERVER_ERROR, // 500 para outros erros
         }
     }
 }
@@ -188,6 +199,12 @@ impl From<lettre::error::Error> for ApiError {
 impl From<std::io::Error> for ApiError {
     fn from(error: std::io::Error) -> ApiError {
         ApiError::InternalServerError(error.to_string())
+    }
+}
+
+impl From<uuid::Error> for ApiError {
+    fn from(error: uuid::Error) -> ApiError {
+        ApiError::BadRequest(format!("UUID inválido: {}", error))
     }
 }
 

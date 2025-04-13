@@ -1,7 +1,7 @@
 use actix_web::{web, HttpResponse, Responder, Result as ActixResult, get, post, put, delete};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use crate::errors::app_error::AppError;
+use crate::errors::ApiError;
 use crate::services::security_question_service::SecurityQuestionService;
 use crate::middleware::permission::PermissionAuth;
 
@@ -62,7 +62,7 @@ pub async fn get_security_question_handler(
 ) -> ActixResult<impl Responder> {
     let question_id = path.into_inner();
     let question_uuid = Uuid::parse_str(&question_id)
-        .map_err(|_| AppError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
+        .map_err(|_| ApiError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
     
     let question = service.get_security_question_by_id(&question_uuid)?;
     Ok(web::Json(question))
@@ -76,7 +76,7 @@ pub async fn update_security_question_handler(
 ) -> ActixResult<impl Responder> {
     let question_id = path.into_inner();
     let question_uuid = Uuid::parse_str(&question_id)
-        .map_err(|_| AppError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
+        .map_err(|_| ApiError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
     
     let updated_question = service.update_security_question(
         &question_uuid, 
@@ -94,7 +94,7 @@ pub async fn delete_security_question_handler(
 ) -> ActixResult<impl Responder> {
     let question_id = path.into_inner();
     let question_uuid = Uuid::parse_str(&question_id)
-        .map_err(|_| AppError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
+        .map_err(|_| ApiError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
     
     service.delete_security_question(&question_uuid)?;
     Ok(HttpResponse::Ok().json(serde_json::json!({ "message": "Pergunta de segurança excluída com sucesso ✅" })))
@@ -107,7 +107,7 @@ pub async fn deactivate_security_question_handler(
 ) -> ActixResult<impl Responder> {
     let question_id = path.into_inner();
     let question_uuid = Uuid::parse_str(&question_id)
-        .map_err(|_| AppError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
+        .map_err(|_| ApiError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
     
     let updated_question = service.deactivate_security_question(&question_uuid)?;
     Ok(web::Json(updated_question))
@@ -124,10 +124,10 @@ pub async fn set_user_answer_handler(
     let (user_id, question_id) = path.into_inner();
     
     let user_uuid = Uuid::parse_str(&user_id)
-        .map_err(|_| AppError::BadRequest("ID do usuário inválido 🚫".to_string()))?;
+        .map_err(|_| ApiError::BadRequest("ID do usuário inválido 🚫".to_string()))?;
     
     let question_uuid = Uuid::parse_str(&question_id)
-        .map_err(|_| AppError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
+        .map_err(|_| ApiError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
     
     service.set_user_security_answer(&user_uuid, &question_uuid, &dto.answer)?;
     
@@ -141,7 +141,7 @@ pub async fn get_user_answers_handler(
 ) -> ActixResult<impl Responder> {
     let user_id = path.into_inner();
     let user_uuid = Uuid::parse_str(&user_id)
-        .map_err(|_| AppError::BadRequest("ID do usuário inválido 🚫".to_string()))?;
+        .map_err(|_| ApiError::BadRequest("ID do usuário inválido 🚫".to_string()))?;
     
     let answers = service.get_user_security_answers(&user_uuid)?;
     Ok(web::Json(answers))
@@ -156,10 +156,10 @@ pub async fn verify_user_answer_handler(
     let (user_id, question_id) = path.into_inner();
     
     let user_uuid = Uuid::parse_str(&user_id)
-        .map_err(|_| AppError::BadRequest("ID do usuário inválido 🚫".to_string()))?;
+        .map_err(|_| ApiError::BadRequest("ID do usuário inválido 🚫".to_string()))?;
     
     let question_uuid = Uuid::parse_str(&question_id)
-        .map_err(|_| AppError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
+        .map_err(|_| ApiError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
     
     let is_valid = service.verify_security_answer(&user_uuid, &question_uuid, &dto.answer)?;
     
@@ -174,10 +174,10 @@ pub async fn delete_user_answer_handler(
     let (user_id, question_id) = path.into_inner();
     
     let user_uuid = Uuid::parse_str(&user_id)
-        .map_err(|_| AppError::BadRequest("ID do usuário inválido 🚫".to_string()))?;
+        .map_err(|_| ApiError::BadRequest("ID do usuário inválido 🚫".to_string()))?;
     
     let question_uuid = Uuid::parse_str(&question_id)
-        .map_err(|_| AppError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
+        .map_err(|_| ApiError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
     
     service.delete_user_security_answer(&user_uuid, &question_uuid)?;
     
@@ -191,7 +191,7 @@ pub async fn delete_all_user_answers_handler(
 ) -> ActixResult<impl Responder> {
     let user_id = path.into_inner();
     let user_uuid = Uuid::parse_str(&user_id)
-        .map_err(|_| AppError::BadRequest("ID do usuário inválido 🚫".to_string()))?;
+        .map_err(|_| ApiError::BadRequest("ID do usuário inválido 🚫".to_string()))?;
     
     service.delete_all_user_security_answers(&user_uuid)?;
     

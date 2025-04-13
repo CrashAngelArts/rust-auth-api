@@ -7,6 +7,8 @@ use crate::utils::password_argon2;
 use chrono::Utc;
 use std::env;
 use tracing::info;
+use rand::{thread_rng, Rng};
+use rand::distributions::Alphanumeric;
 
 pub struct UserService;
 
@@ -446,5 +448,121 @@ impl UserService {
             // Usa verificação bcrypt
             Ok(verify(password, password_hash)?)
         }
+    }
+
+    // ----- Métodos adicionais para recuperação de senha -----
+
+    // Método para gerar hash da senha
+    pub fn hash_password(password: &str, salt_rounds: u32) -> Result<String, ApiError> {
+        Ok(hash(password, salt_rounds)?)
+    }
+
+    // Gera um código de recuperação único para o usuário
+    pub fn generate_recovery_code(
+        pool: &DbPool,
+        user_id: &str,
+        expiration_hours: i64,
+    ) -> Result<String, ApiError> {
+        let conn = pool.get()?;
+        
+        // Gerar código alfanumérico único
+        let recovery_code: String = thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(24) // Código com 24 caracteres
+            .map(char::from)
+            .collect();
+        
+        // Calcular data de expiração
+        let now = Utc::now();
+        let expires_at = now + chrono::Duration::hours(expiration_hours);
+        
+        // Salvar o código no banco de dados
+        conn.execute(
+            "UPDATE users SET 
+             recovery_code = ?1,
+             recovery_code_expires_at = ?2,
+             updated_at = ?3
+             WHERE id = ?4",
+            (
+                &recovery_code,
+                &expires_at,
+                &now,
+                &user_id,
+            ),
+        )?;
+        
+        info!("🔑 Código de recuperação gerado para usuário ID {}", user_id);
+        
+        Ok(recovery_code)
+    }
+
+    // Verifica se um código de recuperação é válido
+    pub fn verify_recovery_code(
+        pool: &DbPool,
+        user_id: &str,
+        code: &str,
+    ) -> Result<bool, ApiError> {
+        let conn = pool.get()?;
+        
+        // Buscar o código e a data de expiração
+        let result = conn.query_row(
+            "SELECT recovery_code, recovery_code_expires_at 
+             FROM users
+             WHERE id = ?1",
+            [user_id],
+            |row| {
+                let stored_code: Option<String> = row.get(0)?;
+                let expires_at: Option<chrono::DateTime<Utc>> = row.get(1)?;
+                Ok((stored_code, expires_at))
+            },
+        );
+        
+        match result {
+            Ok((Some(stored_code), Some(expires_at))) => {
+                // Verificar se o código corresponde e não expirou
+                let now = Utc::now();
+                if stored_code == code && expires_at > now {
+                    Ok(true)
+                } else if expires_at <= now {
+                    info!("🕒 Código de recuperação expirado para usuário ID {}", user_id);
+                    Ok(false)
+                } else {
+                    info!("❌ Código de recuperação inválido para usuário ID {}", user_id);
+                    Ok(false)
+                }
+            },
+            Ok(_) => {
+                // Código não definido ou data de expiração ausente
+                info!("❓ Nenhum código de recuperação definido para usuário ID {}", user_id);
+                Ok(false)
+            },
+            Err(e) => {
+                Err(ApiError::DatabaseError(e.to_string()))
+            }
+        }
+    }
+
+    // Limpa o código de recuperação após uso
+    pub fn clear_recovery_code(
+        pool: &DbPool,
+        user_id: &str,
+    ) -> Result<(), ApiError> {
+        let conn = pool.get()?;
+        
+        conn.execute(
+            "UPDATE users SET 
+             recovery_code = NULL,
+             recovery_code_expires_at = NULL,
+             updated_at = ?1
+             WHERE id = ?2",
+            (
+                &Utc::now(),
+                &user_id,
+            ),
+        )?;
+        
+        info!("🧹 Código de recuperação limpo para usuário ID {}", user_id);
+        
+        Ok(())
     }
 }

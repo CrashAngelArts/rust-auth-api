@@ -75,6 +75,11 @@ pub struct TokenClaims {
     pub is_admin: bool,     // Flag de administrador
     pub exp: usize,         // Timestamp de expiração
     pub iat: usize,         // Timestamp de emissão
+    pub jti: String,        // ID único do token
+    pub aud: Option<Vec<String>>, // Audiência do token
+    pub iss: Option<String>,      // Emissor do token
+    pub fam: Option<String>,      // Família de tokens
+    pub tfv: Option<bool>,        // Flag de verificação 2FA
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -84,6 +89,7 @@ pub struct AuthResponse {
     pub expires_in: i64, // Em segundos
     pub refresh_token: String, // Adicionar refresh token
     pub requires_email_verification: bool, // Indica se o login requer verificação por email 📫
+    pub requires_extra_verification: bool, // Indica se é necessária verificação adicional devido a riscos 🔒
     pub user: crate::models::user::User, // Usuário autenticado 👤
 }
 
@@ -161,6 +167,8 @@ pub struct Session {
     pub created_at: DateTime<Utc>,
     pub last_activity_at: DateTime<Utc>,
     pub is_active: bool,
+    pub risk_score: Option<u32>,
+    pub risk_factors: Option<Vec<String>>,
 }
 
 impl Session {
@@ -180,6 +188,8 @@ impl Session {
             created_at: now,
             last_activity_at: now,
             is_active: true,
+            risk_score: None,
+            risk_factors: None,
         }
     }
 

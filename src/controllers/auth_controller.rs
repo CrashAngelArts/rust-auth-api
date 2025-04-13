@@ -139,7 +139,7 @@ pub async fn forgot_password(
     // Solicita a recuperação de senha (apenas se email estiver habilitado)
     if config.email.enabled {
         // Usar .await na chamada assíncrona
-        AuthService::forgot_password(&pool, forgot_dto.into_inner(), &email_service).await?;
+        AuthService::forgot_password(&pool, forgot_dto.into_inner(), &email_service, None).await?;
     } else {
         warn!("⚠️ Tentativa de recuperação de senha com emails desabilitados.");
         // Retornar a mesma mensagem genérica para não vazar informação
@@ -161,7 +161,7 @@ pub async fn reset_password(
     reset_dto.validate()?;
 
     // Redefine a senha
-    AuthService::reset_password(&pool, reset_dto.into_inner(), config.security.password_salt_rounds)?;
+    AuthService::reset_password(&pool, reset_dto.into_inner(), config.security.password_salt_rounds, None)?;
 
     // Retorna a resposta
     Ok(HttpResponse::Ok().json(ApiResponse::<()>::message(

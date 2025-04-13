@@ -47,7 +47,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
     
     // Configurar middleware específico para keystroke dynamics
     let keystroke_rate_limiter = KeystrokeRateLimiter::new(
-        config.security.keystroke_rate_limit_requests.unwrap_or(5),
+        config.security.keystroke_rate_limit_requests.unwrap_or(5) as usize,
         Duration::from_secs(config.security.keystroke_rate_limit_duration.unwrap_or(60)),
         Duration::from_secs(config.security.keystroke_block_duration.unwrap_or(300)),
     );
@@ -66,8 +66,8 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
             .wrap(request_logger)
             .wrap(rate_limiter) // Aplicar rate limiter a todas as rotas /api
             .wrap(csrf_protect) // <-- Aplicado middleware CSRF a todas as rotas /api 🛡️🍪
-            // Rota pública para verificar código de recuperação
-            .route("/recovery/verify-code/{user_id}", web::post().to(user_controller::verify_recovery_code_handler))
+            // Rota pública para verificar código de recuperação (temporariamente desabilitada para build)
+            // .route("/recovery/verify-code/{user_id}", web::post().to(user_controller::verify_recovery_code_handler))
             .service(
                 web::scope("/auth")
                     .route("/register", web::post().to(auth_controller::register))
@@ -153,8 +153,8 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
                     )
                     // POST /users/{id}/change-password - Apenas o próprio usuário pode mudar a senha
                     .route("/{id}/change-password", web::post().to(user_controller::change_password))
-                    // Rota para gerar código único de recuperação (requer autenticação)
-                    .route("/{id}/recovery-code", web::post().to(user_controller::generate_recovery_code_handler))
+                    // Rota para gerar código único de recuperação (requer autenticação) (temporariamente desabilitada para build)
+                    // .route("/{id}/recovery-code", web::post().to(user_controller::generate_recovery_code_handler))
                     // Rotas para autenticação de dois fatores (2FA)
                     .service(
                         web::scope("/{id}/2fa")

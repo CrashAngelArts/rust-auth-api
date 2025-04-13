@@ -19,6 +19,8 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid; // Importar Uuid
 use moka::future::Cache; // Importar Moka Cache
 use crate::services::security_question_service::SecurityQuestionService; // Adicionar importação
+use rusqlite::params;
+use validator::Validate;
 
 pub struct AuthService;
 
@@ -266,8 +268,8 @@ impl AuthService {
             token_type: "Bearer".to_string(),
             expires_in: Self::parse_expiration(&config.jwt.expiration)? * 3600, // Converte horas para segundos
             refresh_token: original_refresh_token, // Retornar o token original para o cliente
-            requires_email_verification: requires_email_verification, // Indica se o login requer verificação por email 📫
-            requires_extra_verification, // Passar o resultado da análise de risco
+            requires_email_verification: false, // Não é necessário verificação por email neste caso
+            requires_extra_verification, // Adicionar campo que estava faltando
             user: user.clone(), // Adicionar o usuário na resposta 👤
         };
 
@@ -316,7 +318,7 @@ impl AuthService {
             (user.id.to_string(), token_hash, expires_at, now),
         ).map_err(|e| {
             error!("Erro ao criar token de recuperação: {}", e);
-            ApiError::InternalServerError
+            ApiError::InternalServerError("Erro ao criar token de recuperação".to_string())
         })?;
         
         // Registra a tentativa de recuperação de senha
@@ -335,7 +337,7 @@ impl AuthService {
                 Ok(_) => info!("Email de recuperação enviado para: {}", user.email),
                 Err(e) => {
                     error!("Falha ao enviar email de recuperação: {}", e);
-                    return Err(ApiError::InternalServerError);
+                    return Err(ApiError::InternalServerError("Falha ao enviar email de recuperação".to_string()));
                 }
             }
         } else {
@@ -358,7 +360,7 @@ impl AuthService {
                 // Não retorna erro, para permitir que o frontend solicite as perguntas de segurança
             } else {
                 // Se não temos o serviço de perguntas de segurança e não podemos enviar email
-                return Err(ApiError::InternalServerError);
+                return Err(ApiError::InternalServerError("Não foi possível enviar email e não há serviço de perguntas de segurança disponível".to_string()));
             }
         }
         
@@ -409,7 +411,7 @@ impl AuthService {
             // 3.3. Limpar o código usado
             UserService::clear_recovery_code(pool, &user_id)?;
 
-        } else if let Some(token_value) = reset_dto.token {
+        } else if let Some(ref token_value) = reset_dto.token {
             // --- Usando Token de Email ---
             info!("📧 Tentativa de reset de senha via token de email");
             // 3.1. Buscar e validar o token de reset de senha
@@ -417,7 +419,7 @@ impl AuthService {
                 "SELECT id, user_id, token, expires_at, created_at
                  FROM password_reset_tokens
                  WHERE token = ?1",
-                [&token_value],
+                [token_value],
                 |row| {
                     Ok(PasswordResetToken {
                         id: row.get(0)?,
@@ -518,6 +520,7 @@ impl AuthService {
             expires_in: Self::parse_expiration(&config.jwt.expiration)? * 3600,
             refresh_token: refresh_dto.refresh_token, // Retorna o mesmo refresh token
             requires_email_verification: false, // Não requer verificação por email no refresh
+            requires_extra_verification: false, // Não é necessário verificação de risco neste caso
             user: user.clone(), // Adicionar o usuário na resposta 👤
         };
 
@@ -689,7 +692,7 @@ impl AuthService {
             aud: Some(vec!["rust-auth-api-users".to_string()]), // Definir audiência
             iss: Some("rust-auth-api".to_string()), // Definir emissor
             jti: token_id, // ID único do token
-            fam: token_family, // Família de tokens
+            fam: Some(token_family), // Família de tokens
             tfv: Some(false), // Inicialmente não verificado por 2FA
         };
 
@@ -718,9 +721,11 @@ impl AuthService {
             ip_address: ip_address.to_string(),
             user_agent: user_agent.to_string(),
             created_at: Utc::now(),
-            expires_at: Utc::now() + Duration::hours(24), // Sessão expira em 24 horas
+            expires_at: Utc::now() + Duration::hours(24), // 24 horas de duração
             last_activity_at: Utc::now(),
             is_active: true,
+            risk_score: None, // Adicionar campo risk_score
+            risk_factors: None, // Adicionar campo risk_factors
         };
 
         // Insere a sessão no banco de dados
@@ -960,6 +965,7 @@ impl AuthService {
             expires_in: hours * 3600, // Converte horas para segundos
             user: user.clone(),
             requires_email_verification: false, // Por padrão não requer verificação de email 📫
+            requires_extra_verification: false, // Não é necessário verificação de risco neste caso
         };
         Ok(auth_response)
     }

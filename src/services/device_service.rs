@@ -1,13 +1,14 @@
+use crate::config::Config;
 use crate::db::DbPool;
 use crate::errors::ApiError;
 use crate::models::auth::Session;
 use crate::models::device::{DeviceInfo, DeviceListResponse};
-use chrono::Utc;
+use chrono::{Datelike, Timelike, Utc};
 use rusqlite::params;
 use tracing::{info, warn, error};
 use woothee::parser::Parser;
 use serde_json;
-use crate::config::Config;
+use std::time::SystemTime;
 
 pub struct DeviceService;
 
@@ -247,11 +248,13 @@ impl DeviceService {
             expires_at: now + chrono::Duration::hours(duration_hours),
             last_activity_at: now,
             is_active: true,
+            risk_score: None,
+            risk_factors: None,
         };
         
         // Detectar tipo de dispositivo
         let device_type_info = Self::detect_device_type(user_agent);
-        let current_device_type = device_type_info.clone().unwrap_or_default(); // Para comparação
+        let _current_device_type = device_type_info.clone().unwrap_or_default(); // Para comparação
         
         // Gerar localização aproximada (simulada para este exemplo)
         // TODO: Implementar geolocalização de IP real usando biblioteca externa (ex: maxminddb)

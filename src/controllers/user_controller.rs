@@ -6,7 +6,7 @@ use crate::models::auth::TokenClaims;
 use crate::models::response::{ApiResponse, PaginatedResponse};
 use crate::models::user::{ChangePasswordDto, UpdateUserDto, UserResponse};
 use crate::services::user_service::UserService;
-use actix_web::{web, HttpMessage, HttpRequest, HttpResponse, Responder};
+use actix_web::{web, HttpMessage, HttpRequest, HttpResponse, Responder, post};
 use serde::Deserialize;
 use validator::Validate;
 
@@ -125,11 +125,10 @@ pub async fn change_password(
 
     change_dto.validate()?;
     UserService::change_password(
-        &pool, 
+        &pool,
         &user_id, 
-        &change_dto.current_password, 
-        &change_dto.new_password, 
-        config.security.password_salt_rounds
+        change_dto.into_inner(),
+        config.security.password_salt_rounds,
     )?;
     Ok(HttpResponse::Ok().json(ApiResponse::<()>::message(
         "Senha alterada com sucesso",
@@ -190,9 +189,9 @@ pub async fn generate_recovery_code_handler(
 
     // Gerar o código (UserService fará o hash e salvará)
     let recovery_code = UserService::generate_recovery_code(
-        &pool, 
-        &user_id, 
-        config.security.password_salt_rounds
+        &pool,
+        &user_id,
+        config.security.password_salt_rounds as i64,
     )?;
 
     let response = RecoveryCodeResponse {
