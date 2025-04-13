@@ -14,6 +14,7 @@ use actix_web::{
 use validator::Validate;
 use serde::Serialize;
 use crate::middleware::auth::AuthenticatedUser;
+use crate::middleware::auth::AdminAuth;
 
 // --- Structs de Resposta Específicas --- 
 #[derive(Serialize)]
@@ -249,29 +250,30 @@ async fn check_user_permission_handler(
 
 // Função para configurar o escopo das rotas RBAC
 pub fn configure_rbac_routes(cfg: &mut web::ServiceConfig) {
-    cfg
-        // Permissões
-        .service(create_permission)
-        .service(list_permissions)
-        .service(get_permission_by_id)
-        .service(get_permission_by_name)
-        .service(update_permission)
-        .service(delete_permission)
-        // Papéis
-        .service(create_role)
-        .service(list_roles)
-        .service(get_role_by_id)
-        .service(get_role_by_name)
-        .service(update_role)
-        .service(delete_role)
-        // Associações Papel <-> Permissão
-        .service(assign_permission_to_role_handler)
-        .service(revoke_permission_from_role_handler)
-        .service(get_role_permissions_handler)
-        // Associações Usuário <-> Papel
-        .service(assign_role_to_user_handler)
-        .service(revoke_role_from_user_handler)
-        .service(get_user_roles_handler)
-        // Verificação
-        .service(check_user_permission_handler);
+    // Rotas de Leitura (acessíveis a usuários autenticados)
+    cfg.service(list_permissions);
+    cfg.service(get_permission_by_id);
+    cfg.service(get_permission_by_name);
+    cfg.service(list_roles);
+    cfg.service(get_role_by_id);
+    cfg.service(get_role_by_name);
+    cfg.service(get_role_permissions_handler);
+    cfg.service(get_user_roles_handler);
+    cfg.service(check_user_permission_handler); // Quem pode checar? Por ora, autenticado.
+
+    // Rotas de Escrita (requerem Admin)
+    cfg.service(
+        web::scope("") // Escopo vazio para aplicar middleware
+            .wrap(AdminAuth::new())
+            .service(create_permission)
+            .service(update_permission)
+            .service(delete_permission)
+            .service(create_role)
+            .service(update_role)
+            .service(delete_role)
+            .service(assign_permission_to_role_handler)
+            .service(revoke_permission_from_role_handler)
+            .service(assign_role_to_user_handler)
+            .service(revoke_role_from_user_handler)
+    );
 }

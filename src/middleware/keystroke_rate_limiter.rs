@@ -15,7 +15,7 @@ use crate::errors::{ApiError, ErrorResponse};
 use std::rc::Rc;
 
 // Estrutura para armazenar tentativas de verificação por usuário
-struct KeystrokeAttempts {
+pub struct KeystrokeAttempts {
     attempts: Vec<Instant>,
     blocked_until: Option<Instant>,
 }

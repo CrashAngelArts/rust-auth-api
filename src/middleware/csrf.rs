@@ -3,7 +3,7 @@ use actix_web::{
     cookie::{Cookie, SameSite},
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
     http::{header, Method, StatusCode},
-    Error, HttpMessage, HttpResponse, ResponseError,
+    Error, HttpResponse, ResponseError,
 };
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD as B64_ENGINE, Engine as _};
 use futures_util::future::{self, LocalBoxFuture, Ready};
