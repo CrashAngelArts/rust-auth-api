@@ -19,6 +19,7 @@ use crate::middleware::{
     rate_limiter::RateLimiter,
     keystroke_rate_limiter::KeystrokeRateLimiter,
     email_verification::EmailVerificationCheck, // Novo middleware de verificação por email 
+    csrf::CsrfProtect, // <-- Adicionado middleware CSRF 🛡️🍪
 };
 use crate::services::keystroke_security_service::KeystrokeSecurityService;
 use actix_web::{web, HttpResponse};
@@ -40,6 +41,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
         config.security.rate_limit_duration,
     );
     let email_verification_check = EmailVerificationCheck::new(); // Middleware de verificação por email 📧
+    let csrf_protect = CsrfProtect::from_config(config); // <-- Instanciado middleware CSRF 🛡️🍪
     
     // Configurar middleware específico para keystroke dynamics
     let keystroke_rate_limiter = KeystrokeRateLimiter::new(
@@ -61,6 +63,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
             .wrap(error_handler)
             .wrap(request_logger)
             .wrap(rate_limiter) // Aplicar rate limiter a todas as rotas /api
+            .wrap(csrf_protect) // <-- Aplicado middleware CSRF a todas as rotas /api 🛡️🍪
             .service(
                 web::scope("/auth")
                     .route("/register", web::post().to(auth_controller::register))

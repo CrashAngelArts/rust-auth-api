@@ -1,6 +1,7 @@
 use dotenv::dotenv;
 use serde::Deserialize;
 use std::env;
+use tracing::info;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
@@ -61,6 +62,7 @@ pub struct SecurityConfig {
     
     // Configuração para verificação por email após login
     pub email_verification_enabled: bool,            // Habilita/desabilita verificação por email após login 📧
+    pub csrf_secret: String, // <-- Adicionado Segredo para gerar e validar tokens CSRF 🛡️🍪
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -105,7 +107,20 @@ pub struct OAuthConfig {
 
 impl Config {
     pub fn from_env() -> Result<Self, env::VarError> {
-        dotenv().ok();
+        // Tenta carregar .env e loga o resultado
+        match dotenv() {
+            Ok(path) => info!("✅ Arquivo .env carregado de: {:?}", path),
+            Err(e) => info!("⚠️ Não foi possível carregar o arquivo .env: {}. Usando variáveis de ambiente existentes.", e),
+        };
+
+        // Log para verificar as variáveis obrigatórias ANTES de tentar usá-las
+        info!("🔍 Verificando variáveis de ambiente obrigatórias...");
+        info!("  JWT_SECRET presente: {}", env::var("JWT_SECRET").is_ok());
+        info!("  EMAIL_USERNAME presente: {}", env::var("EMAIL_USERNAME").is_ok());
+        info!("  EMAIL_PASSWORD presente: {}", env::var("EMAIL_PASSWORD").is_ok());
+        info!("  EMAIL_FROM presente: {}", env::var("EMAIL_FROM").is_ok());
+        info!("  CSRF_SECRET presente: {}", env::var("CSRF_SECRET").is_ok());
+        info!("🔍 Verificação concluída.");
 
         let server = ServerConfig {
             host: env::var("SERVER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string()),
@@ -121,15 +136,15 @@ impl Config {
 
         let jwt = JwtConfig {
             secret: env::var("JWT_SECRET")?,
-            expiration: env::var("JWT_EXPIRATION").unwrap_or_else(|_| "1h".to_string()), // Reduzir expiração padrão do access token
+            expiration: env::var("JWT_EXPIRATION").unwrap_or_else(|_| "1h".to_string()),
             refresh_expiration_days: env::var("JWT_REFRESH_EXPIRATION_DAYS")
-                .unwrap_or_else(|_| "7".to_string()) // Padrão: 7 dias
+                .unwrap_or_else(|_| "7".to_string())
                 .parse()
                 .unwrap_or(7),
         };
 
         let email = EmailConfig {
-            smtp_server: env::var("SMTP_SERVER").unwrap_or_else(|_| "smtp.example.com".to_string()), // Usar um placeholder genérico
+            smtp_server: env::var("SMTP_SERVER").unwrap_or_else(|_| "smtp.example.com".to_string()),
             smtp_port: env::var("SMTP_PORT")
                 .unwrap_or_else(|_| "587".to_string())
                 .parse()
@@ -138,7 +153,7 @@ impl Config {
             password: env::var("EMAIL_PASSWORD")?,
             from: env::var("EMAIL_FROM")?,
             from_name: env::var("EMAIL_FROM_NAME").unwrap_or_else(|_| "API de Autenticação".to_string()),
-            base_url: env::var("EMAIL_BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string()), // URL base para links
+            base_url: env::var("EMAIL_BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string()),
             enabled: env::var("EMAIL_ENABLED")
                 .unwrap_or_else(|_| "false".to_string())
                 .parse()
@@ -160,15 +175,15 @@ impl Config {
                 .unwrap_or(60),
             // Carregar novas configurações de bloqueio
             max_login_attempts: env::var("MAX_LOGIN_ATTEMPTS")
-                .unwrap_or_else(|_| "5".to_string()) // Padrão: 5 tentativas
+                .unwrap_or_else(|_| "5".to_string())
                 .parse()
                 .unwrap_or(5),
             lockout_duration_seconds: env::var("LOCKOUT_DURATION_SECONDS")
-                .unwrap_or_else(|_| "3600".to_string()) // Padrão: 3600 segundos (1 hora)
+                .unwrap_or_else(|_| "3600".to_string())
                 .parse()
                 .unwrap_or(3600),
             unlock_token_duration_minutes: env::var("UNLOCK_TOKEN_DURATION_MINUTES")
-                .unwrap_or_else(|_| "30".to_string()) // Padrão: 30 minutos
+                .unwrap_or_else(|_| "30".to_string())
                 .parse()
                 .unwrap_or(30),
             
@@ -188,9 +203,10 @@ impl Config {
                 
             // Configuração para verificação por email após login
             email_verification_enabled: env::var("EMAIL_VERIFICATION_ENABLED")
-                .unwrap_or_else(|_| "true".to_string()) // Habilitado por padrão
+                .unwrap_or_else(|_| "true".to_string())
                 .parse()
                 .unwrap_or(true),
+            csrf_secret: env::var("CSRF_SECRET")?,
         };
 
         let cors = CorsConfig {

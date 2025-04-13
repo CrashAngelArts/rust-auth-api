@@ -7,12 +7,13 @@ description = "API REST em Rust com autenticação JWT e SQLite"
 
 [dependencies]
 # Framework web
-actix-web = "4.4.0"
+actix-web = "4"
 actix-cors = "0.6.4"
 actix-rt = "2.9.0"
 actix-session = { version = "0.7.2", features = ["cookie-session"] }
 actix-files = "0.6.2" # Para servir arquivos estáticos
 futures = "0.3.28"
+futures-util = "0.3"
 
 # Banco de dados
 rusqlite = { version = "0.29.0", features = ["bundled", "chrono"] }
@@ -24,7 +25,7 @@ refinery-macros = "0.8"
 # Autenticação e segurança
 jsonwebtoken = "8.3.0"
 bcrypt = "0.15.0"
-rand = "0.8.5"
+rand = "0.8"
 sha2 = "0.10" # Para hashing de refresh tokens
 hex = "0.4"   # Para codificar/decodificar hash
 # Novas dependências de segurança
@@ -34,7 +35,10 @@ argon2 = "0.5.0"  # Algoritmo de hashing mais seguro que bcrypt
 totp-rs = "5.6.0"  # Para implementação de 2FA/TOTP
 qrcode = "0.12.0"  # Para gerar QR codes para 2FA
 base32 = "0.4.0"  # Para codificação base32 usada em 2FA
-base64 = "0.21.0"  # Para codificação base64
+base64 = "0.21" # Para codificar/decodificar tokens
+ring = "0.17" # Para comparação segura
+cookie = "0.18" # Helper para construir cookies (usado por actix-web::cookie)
+log = "0.4" # Para logging
 
 # OAuth e autenticação social
 oauth2 = "4.4.1"  # Cliente OAuth2
@@ -43,7 +47,7 @@ url = "2.4.1"  # Manipulação de URLs
 async-trait = "0.1.73"  # Para traits assíncronas
 
 # Serialização/Deserialização
-serde = { version = "1.0.188", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.107"
 
 # Configuração
@@ -63,7 +67,7 @@ lettre = { version = "0.10.4", features = ["smtp-transport", "tokio1", "tokio1-n
 # Utilitários
 chrono = { version = "0.4.30", features = ["serde"] }
 uuid = { version = "1.4.1", features = ["v4", "serde"] }
-thiserror = "1.0.48"
+thiserror = "1.0" # Para criar erros facilmente
 validator = { version = "0.16.1", features = ["derive"] }
 rustc_version_runtime = "0.2.1"
 tokio = { version = "1.32.0", features = ["full", "sync", "time"] }
