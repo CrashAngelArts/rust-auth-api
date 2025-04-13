@@ -581,7 +581,8 @@ impl AuthService {
     // Valida um token JWT
     pub async fn validate_token( // Tornar async
         token: &str, 
-        jwt_secret: &str, 
+        jwt_secret: &str,
+        pool: Option<&DbPool>, // Adicionar pool como opcional para verificar blacklist 
         cache: &Cache<String, TokenClaims> // Adicionar parâmetro do cache
     ) -> Result<TokenClaims, ApiError> {
         // 1. Verificar cache primeiro
@@ -592,7 +593,11 @@ impl AuthService {
 
         // 2. Se não estiver no cache, decodificar e validar
         let decoding_key = DecodingKey::from_secret(jwt_secret.as_bytes());
-        let validation = Validation::default(); // TODO: Adicionar validação de audiência/issuer se necessário
+        
+        // Configurar validação com audiência e issuer
+        let mut validation = Validation::default();
+        validation.set_audience(&["rust-auth-api-users"]); // Definir a audiência esperada
+        validation.set_issuer(&["rust-auth-api"]); // Definir o emissor esperado
 
         // Decodifica o token
         let token_data = decode::<TokenClaims>(token, &decoding_key, &validation)
@@ -601,8 +606,20 @@ impl AuthService {
                 ApiError::AuthenticationError(format!("Falha na decodificação: {}", e)) // Usar AuthenticationError
             })?;
 
-        // TODO: Verificar se o token está na blacklist aqui
-        // Exemplo: if is_token_blacklisted(pool, &token_data.claims.jti).await { return Err(...) }
+        // Verificar se o token está na blacklist (se o pool for fornecido)
+        if let Some(db_pool) = pool {
+            use crate::services::token_service::TokenService;
+            
+            if token_data.claims.jti.is_empty() {
+                warn!("🔒 Token sem JTI (ID) para verificação de blacklist");
+                return Err(ApiError::AuthenticationError("Token inválido: sem ID".to_string()));
+            }
+            
+            if TokenService::is_token_blacklisted(db_pool, &token_data.claims.jti)? {
+                warn!("🚫 Token na blacklist: {}", token_data.claims.jti);
+                return Err(ApiError::AuthenticationError("Token revogado".to_string()));
+            }
+        }
 
         // 3. Inserir no cache após validação bem-sucedida
         // Usamos token.to_string() porque a chave precisa ser 'Owned'
@@ -619,6 +636,12 @@ impl AuthService {
         let exp = (now + Duration::hours(expiration)).timestamp() as usize;
         let iat = now.timestamp() as usize;
 
+        // Gerar um token_id único (JTI)
+        let token_id = Uuid::now_v7().to_string();
+        
+        // Obter a família de tokens do usuário ou criar uma nova
+        let token_family = "default_family".to_string(); // Idealmente, obter do banco de dados
+        
         let claims = TokenClaims {
             sub: user.id.clone(),
             username: user.username.clone(),
@@ -626,6 +649,11 @@ impl AuthService {
             is_admin: user.is_admin,
             exp,
             iat,
+            aud: Some(vec!["rust-auth-api-users".to_string()]), // Definir audiência
+            iss: Some("rust-auth-api".to_string()), // Definir emissor
+            jti: token_id, // ID único do token
+            fam: token_family, // Família de tokens
+            tfv: Some(false), // Inicialmente não verificado por 2FA
         };
 
         let token = encode(

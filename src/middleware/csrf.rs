@@ -8,7 +8,6 @@ use actix_web::{
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD as B64_ENGINE, Engine as _};
 use futures_util::future::{self, LocalBoxFuture, Ready};
 use rand::{rngs::OsRng, RngCore};
-use ring::constant_time;
 use std::rc::Rc;
 use thiserror::Error;
 use crate::config::Config;
@@ -17,6 +16,28 @@ use crate::config::Config;
 const CSRF_COOKIE_NAME: &str = "csrf_token";
 const CSRF_HEADER_NAME: &str = "X-CSRF-Token";
 const CSRF_TOKEN_BYTE_LENGTH: usize = 32;
+
+// --- Funções de Segurança ---
+
+/// Implementação segura de comparação de tempo constante para evitar ataques de timing
+/// Esta função substitui o uso de ring::constant_time::verify_slices_are_equal
+fn constant_time_compare(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    
+    // Usando um acumulador para tornar a operação de tempo constante
+    // independente do conteúdo dos slices
+    let mut result: u8 = 0;
+    
+    for (x, y) in a.iter().zip(b.iter()) {
+        // XOR detectará diferenças; OR acumulará esses resultados
+        result |= x ^ y;
+    }
+    
+    // Se qualquer bit for diferente, result != 0
+    result == 0
+}
 
 // --- Erro CSRF ---
 #[derive(Debug, Error)]
@@ -141,7 +162,7 @@ where
                 }
             };
 
-            if constant_time::verify_slices_are_equal(cookie_token.as_bytes(), header_token.as_bytes()).is_err() {
+            if !constant_time_compare(cookie_token.as_bytes(), header_token.as_bytes()) {
                  log::warn!("🛡️ [CSRF] Falha na validação (cookie vs header) para {} {}", method, path);
                  return Box::pin(future::err(CsrfError::TokenMismatch.into()));
             }

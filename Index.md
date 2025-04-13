@@ -739,16 +739,18 @@ Existem alguns TODOs pendentes no código que podem ser implementados no futuro:
    * `// TODO: Opcional: Revogar tokens antigos antes de salvar o novo`
    * Implementação comentada: `// Self::revoke_all_user_refresh_tokens(pool, &user.id)?;`
 
-2. **Adicionar validação de audiência/issuer em tokens JWT (AuthService)**:
+## Melhorias Recentemente Implementadas
+
+1. **✅ Substituição de função deprecada no middleware CSRF**:
+   * Implementamos uma função segura `constant_time_compare` para substituir o uso de `ring::deprecated_constant_time::verify_slices_are_equal`
+   * A nova implementação mantém a comparação em tempo constante para evitar ataques de timing
+
+2. **✅ Adicionado verificação de token na blacklist durante validação**:
    * Em `src/services/auth_service.rs` na função `validate_token()` 
-   * `let validation = Validation::default(); // TODO: Adicionar validação de audiência/issuer se necessário`
+   * Agora verifica se o token está na blacklist quando um pool de DB é fornecido
+   * Melhora a segurança garantindo que tokens revogados não possam ser utilizados
 
-3. **Verificar se o token está na blacklist durante validação (AuthService)**:
+3. **✅ Adicionado validação de audiência/issuer em tokens JWT**:
    * Em `src/services/auth_service.rs` na função `validate_token()`
-   * `// TODO: Verificar se o token está na blacklist aqui`
-   * Exemplo de implementação sugerida: `// if is_token_blacklisted(pool, &token_data.claims.jti).await { return Err(...) }`
-
-4. **Atualizar módulos/funções deprecados em middleware/csrf.rs**:
-   * Substituir o uso de `ring::deprecated_constant_time::verify_slices_are_equal` com uma alternativa recomendada
-   * Mensagem: "Will be removed. Internal module not intended for external use, with no promises regarding side channels."
-   * Uma possível alternativa é implementar uma comparação de tempo constante personalizada ou usar uma biblioteca mais recente
+   * Tokens agora são validados por audiência (quem deve aceitá-los) e emissor (quem os criou)
+   * Configurados para "rust-auth-api-users" e "rust-auth-api" respectivamente

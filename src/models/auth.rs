@@ -56,6 +56,11 @@ pub struct TokenClaims {
     pub is_admin: bool,     // Flag de administrador
     pub exp: usize,         // Timestamp de expiração
     pub iat: usize,         // Timestamp de emissão
+    pub aud: Option<Vec<String>>, // Audiência do token (quem deve aceitá-lo)
+    pub iss: Option<String>, // Emissor do token (quem o criou)
+    pub jti: String,        // ID único do token (para blacklist)
+    pub fam: String,        // Família do token (para invalidação em cadeia)
+    pub tfv: Option<bool>,  // Flag de verificação 2FA
 }
 
 #[derive(Debug, Serialize, Deserialize)]

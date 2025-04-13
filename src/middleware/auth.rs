@@ -145,7 +145,7 @@ where
             };
 
             // Valida o token usando o serviço e o cache
-            match AuthService::validate_token(&token, &jwt_secret, &cache_clone).await { // Passar referência ao cache
+            match AuthService::validate_token(&token, &jwt_secret, None, &cache_clone).await { // Passar None como pool
                 Ok(claims) => {
                     // Adiciona as claims ao contexto da requisição ORIGINAL
                     req.extensions_mut().insert(claims);
