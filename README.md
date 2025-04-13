@@ -1,6 +1,6 @@
 # Rust Auth API 🚀
 
-API REST em Rust com autenticação avançada, análise de ritmo de digitação e banco de dados SQLite.
+API REST em Rust com autenticação avançada, análise de ritmo de digitação, RBAC e banco de dados SQLite.
 
 ## Características Principais
 
@@ -23,7 +23,8 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação 
 - Detecção de anomalias e monitoramento de segurança 🛡️
 - Autenticação OAuth com provedores sociais 🌐
 - Cache de validação de token JWT (Moka) para otimizar performance ⚡
-- RBAC (Role-Based Access Control) para gerenciamento fino de permissões 🎭
+- RBAC (Role-Based Access Control) com gerenciamento fino de permissões 🎭
+- Autorização granular baseada em permissões via middleware 🔐
 
 ### Funcionalidades 🛠️
 - Sistema completo de autenticação
@@ -42,7 +43,9 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação 
 - Gerenciamento completo de dispositivos conectados (listar, visualizar, atualizar, revogar) 📱
 - Manutenção automática de tokens, códigos e sessões expiradas 🧹
 - Login com Google, Facebook, Microsoft, GitHub e Apple 🔑
-- Gerenciamento básico de Permissões (CRUD) via serviço RBAC 📄
+- Gerenciamento completo de Permissões e Papéis (CRUD) via serviço RBAC 📄🎭
+- Associação entre Papéis/Permissões e Usuários/Papéis via serviço RBAC 🔗
+- Verificação de permissões de usuário via serviço RBAC ✅
 
 ## Requisitos
 
@@ -215,16 +218,33 @@ ADMIN_NAME=Administrador
 ### RBAC (Controle de Acesso Baseado em Papéis) (`/api/rbac`) 🎭
 
 #### Permissões (`/permissions`)
-- `POST /` - Criar nova permissão (requer privilégios)
-- `GET /` - Listar todas as permissões
-- `GET /{id}` - Obter detalhes de uma permissão
-- `GET /by-name/{name}` - Obter detalhes de uma permissão pelo nome
-- `PUT /{id}` - Atualizar uma permissão (requer privilégios)
-- `DELETE /{id}` - Deletar uma permissão (requer privilégios)
+- `POST /` - Criar nova permissão (requer permissão `permissions:manage`)
+- `GET /` - Listar todas as permissões (requer login)
+- `GET /{id}` - Obter detalhes de uma permissão (requer login)
+- `GET /by-name/{name}` - Obter detalhes de uma permissão pelo nome (requer login)
+- `PUT /{id}` - Atualizar uma permissão (requer permissão `permissions:manage`)
+- `DELETE /{id}` - Deletar uma permissão (requer permissão `permissions:manage`)
 
-#### Papéis (`/roles`) - *TODO*
+#### Papéis (`/roles`)
+- `POST /` - Criar novo papel (requer permissão `roles:manage`)
+- `GET /` - Listar todos os papéis (requer login)
+- `GET /{id}` - Obter detalhes de um papel (requer login)
+- `GET /by-name/{name}` - Obter detalhes de um papel pelo nome (requer login)
+- `PUT /{id}` - Atualizar um papel (requer permissão `roles:manage`)
+- `DELETE /{id}` - Deletar um papel (requer permissão `roles:manage`)
 
-#### Associações (`/associations`) - *TODO*
+#### Associações Papel <-> Permissão
+- `POST /roles/{role_id}/permissions/{permission_id}` - Associar permissão a papel (requer `roles:assign-permission`)
+- `DELETE /roles/{role_id}/permissions/{permission_id}` - Revogar permissão de papel (requer `roles:assign-permission`)
+- `GET /roles/{role_id}/permissions` - Listar permissões de um papel (requer login)
+
+#### Associações Usuário <-> Papel
+- `POST /users/{user_id}/roles/{role_id}` - Associar papel a usuário (requer `users:assign-role`)
+- `DELETE /users/{user_id}/roles/{role_id}` - Revogar papel de usuário (requer `users:assign-role`)
+- `GET /users/{user_id}/roles` - Listar papéis de um usuário (requer login)
+
+#### Verificação
+- `GET /check-permission/{user_id}/{permission_name}` - Verificar se usuário tem permissão (requer login)
 
 ### Rota Raiz
 
@@ -234,6 +254,7 @@ ADMIN_NAME=Administrador
 
 - JWT Authentication
 - Admin Authorization
+- Permission Authorization (RBAC) 🔐
 - Rate Limiter (Token Bucket) 🚦
 - CSRF Protection (Double Submit Cookie) 🛡️🍪
 - Request Logger

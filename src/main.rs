@@ -90,7 +90,7 @@ async fn main() -> std::io::Result<()> {
     info!("✅ Cache de validação de token (Moka) inicializado com sucesso");
 
     // Configura os middlewares de segurança
-    let (security_headers, csrf_protection) = configure_security(&config.jwt.secret);
+    let (security_headers, _csrf_protection) = configure_security(&config.jwt.secret);
     
     // Chave para cookies assinados
     let cookie_key = Key::derive_from(config.jwt.secret.as_bytes());

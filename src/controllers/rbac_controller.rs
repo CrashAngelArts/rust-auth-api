@@ -14,7 +14,7 @@ use actix_web::{
 use validator::Validate;
 use serde::Serialize;
 use crate::middleware::auth::AuthenticatedUser;
-use crate::middleware::auth::AdminAuth;
+use crate::middleware::permission::PermissionAuth;
 
 // --- Structs de Resposta Específicas --- 
 #[derive(Serialize)]
@@ -250,7 +250,7 @@ async fn check_user_permission_handler(
 
 // Função para configurar o escopo das rotas RBAC
 pub fn configure_rbac_routes(cfg: &mut web::ServiceConfig) {
-    // Rotas de Leitura (acessíveis a usuários autenticados)
+    // Rotas de Leitura (acessíveis a usuários autenticados - sem wrap adicional aqui)
     cfg.service(list_permissions);
     cfg.service(get_permission_by_id);
     cfg.service(get_permission_by_name);
@@ -259,21 +259,44 @@ pub fn configure_rbac_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(get_role_by_name);
     cfg.service(get_role_permissions_handler);
     cfg.service(get_user_roles_handler);
-    cfg.service(check_user_permission_handler); // Quem pode checar? Por ora, autenticado.
+    cfg.service(check_user_permission_handler);
 
-    // Rotas de Escrita (requerem Admin)
+    // Rotas de Escrita (requerem permissões específicas)
+    // Agrupar por tipo de permissão necessária
+
+    // Gerenciamento de Permissões
     cfg.service(
-        web::scope("") // Escopo vazio para aplicar middleware
-            .wrap(AdminAuth::new())
+        web::scope("/permissions") // Escopo para permissões
+            .wrap(PermissionAuth::new("permissions:manage")) // Requer permissão
             .service(create_permission)
             .service(update_permission)
             .service(delete_permission)
+    );
+
+    // Gerenciamento de Papéis
+    cfg.service(
+        web::scope("/roles") // Escopo para papéis
+            .wrap(PermissionAuth::new("roles:manage")) // Requer permissão
             .service(create_role)
             .service(update_role)
             .service(delete_role)
-            .service(assign_permission_to_role_handler)
-            .service(revoke_permission_from_role_handler)
-            .service(assign_role_to_user_handler)
-            .service(revoke_role_from_user_handler)
+    );
+
+    // Associações Papel <-> Permissão
+    cfg.service(
+        web::scope("/roles/{role_id}/permissions") // Escopo para associações
+            .wrap(PermissionAuth::new("roles:assign-permission")) // Requer permissão
+            .service(assign_permission_to_role_handler)       // POST /{permission_id}
+            .service(revoke_permission_from_role_handler)   // DELETE /{permission_id}
+            // GET já está registrado fora deste wrap
+    );
+
+     // Associações Usuário <-> Papel
+    cfg.service(
+        web::scope("/users/{user_id}/roles") // Escopo para associações
+            .wrap(PermissionAuth::new("users:assign-role")) // Requer permissão
+            .service(assign_role_to_user_handler)       // POST /{role_id}
+            .service(revoke_role_from_user_handler)   // DELETE /{role_id}
+             // GET já está registrado fora deste wrap
     );
 }

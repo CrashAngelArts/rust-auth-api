@@ -221,6 +221,19 @@ Lida com requisições HTTP relacionadas à autenticação OAuth com provedores 
 - `remove_oauth_connection()`: Remove uma conexão OAuth específica
 - `clean_expired_tokens()`: Limpa tokens expirados da lista negra
 
+#### rbac_controller.rs
+Lida com requisições HTTP relacionadas ao Controle de Acesso Baseado em Papéis (RBAC).
+
+**Funções (Handlers):**
+- `create_permission()`, `list_permissions()`, `get_permission_by_id()`, `get_permission_by_name()`, `update_permission()`, `delete_permission()`: Gerencia permissões.
+- `create_role()`, `list_roles()`, `get_role_by_id()`, `get_role_by_name()`, `update_role()`, `delete_role()`: Gerencia papéis.
+- `assign_permission_to_role_handler()`, `revoke_permission_from_role_handler()`, `get_role_permissions_handler()`: Gerencia associação entre papéis e permissões.
+- `assign_role_to_user_handler()`, `revoke_role_from_user_handler()`, `get_user_roles_handler()`: Gerencia associação entre usuários e papéis.
+- `check_user_permission_handler()`: Verifica se um usuário possui uma permissão específica.
+
+**Funções Auxiliares:**
+- `configure_rbac_routes()`: Configura os serviços/rotas para o escopo `/api/rbac`.
+
 ### Models Module (`src/models/`) 
 
 #### device.rs
@@ -495,22 +508,24 @@ Gerencia a lógica do Controle de Acesso Baseado em Papéis (RBAC).
 - `update_permission()`: Atualiza uma permissão existente.
 - `delete_permission()`: Deleta uma permissão.
 
-**Funções (Papéis):** (*TODO*)
-- `create_role()`
-- `get_role_by_id()`
-- `get_role_by_name()`
-- `list_roles()`
-- `update_role()`
-- `delete_role()`
+**Funções (Papéis):**
+- `create_role()`: Cria um novo papel.
+- `get_role_by_id()`: Busca um papel pelo ID.
+- `get_role_by_name()`: Busca um papel pelo nome.
+- `list_roles()`: Lista todos os papéis.
+- `update_role()`: Atualiza um papel existente.
+- `delete_role()`: Deleta um papel.
 
-**Funções (Associações):** (*TODO*)
-- `assign_permission_to_role()`
-- `revoke_permission_from_role()`
-- `assign_role_to_user()`
-- `revoke_role_from_user()`
-- `get_user_roles()`
-- `get_role_permissions()`
-- `check_user_permission()`
+**Funções (Associações):** 
+- `assign_permission_to_role()`: Associa uma permissão a um papel.
+- `revoke_permission_from_role()`: Remove a associação entre permissão e papel.
+- `get_role_permissions()`: Lista as permissões de um papel.
+- `assign_role_to_user()`: Associa um papel a um usuário.
+- `revoke_role_from_user()`: Remove a associação entre usuário e papel.
+- `get_user_roles()`: Lista os papéis de um usuário.
+
+**Funções (Verificação):** 
+- `check_user_permission()`: Verifica se um usuário possui uma permissão específica através de seus papéis.
 
 #### oauth_service.rs
 Implementa a lógica de negócios para autenticação OAuth com provedores sociais.
@@ -531,11 +546,14 @@ Implementa a lógica de negócios para autenticação OAuth com provedores socia
 ### Middleware Module (`src/middleware/`) 
 
 #### csrf.rs
-Implementa middleware para proteção contra ataques CSRF (Cross-Site Request Forgery) usando a estratégia Double Submit Cookie. Requer que requisições inseguras enviem um token correspondente no header `X-CSRF-Token` e no cookie `csrf_token`.
+Implementa proteção contra ataques CSRF usando o padrão Double Submit Cookie.
 
 **Structs:**
-- `CsrfProtect`: Transform (fábrica) para o middleware.
-- `CsrfProtectMiddleware`: O middleware de serviço real.
+- `CsrfProtect`: Fábrica do middleware.
+- `CsrfProtectMiddleware`: Implementação do middleware.
+
+**Enums:**
+- `CsrfError`: Erros relacionados à validação CSRF.
 
 #### email_verification.rs
 Implementa middleware para verificação por email após login.
@@ -600,6 +618,13 @@ Implementa configurações de segurança para a API.
 **Functions:**
 - `configure_security()`: Configura headers de segurança e proteção CSRF
 - `get_secure_headers()`: Cria headers de segurança padrão
+
+#### permission.rs
+Implementa um middleware para verificar se o usuário autenticado possui uma permissão RBAC específica.
+
+**Structs:**
+- `PermissionAuth`: Fábrica do middleware, recebe o nome da permissão.
+- `PermissionAuthMiddleware`: Implementação do middleware.
 
 ### Routes Module (`src/routes/`) 
 
