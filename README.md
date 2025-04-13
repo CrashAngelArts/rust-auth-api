@@ -25,6 +25,7 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação,
 - Cache de validação de token JWT (Moka) para otimizar performance ⚡
 - RBAC (Role-Based Access Control) com gerenciamento fino de permissões 🎭
 - Autorização granular baseada em permissões via middleware 🔐
+- Perguntas de segurança para recuperação de conta 🔑
 
 ### Funcionalidades 🛠️
 - Sistema completo de autenticação
@@ -46,6 +47,7 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação,
 - Gerenciamento completo de Permissões e Papéis (CRUD) via serviço RBAC 📄🎭
 - Associação entre Papéis/Permissões e Usuários/Papéis via serviço RBAC 🔗
 - Verificação de permissões de usuário via serviço RBAC ✅
+- Perguntas de segurança personalizáveis para recuperação de conta 🔐
 
 ## Requisitos
 
@@ -246,6 +248,29 @@ ADMIN_NAME=Administrador
 #### Verificação
 - `GET /check-permission/{user_id}/{permission_name}` - Verificar se usuário tem permissão (requer login)
 
+### Perguntas de Segurança (`/api/security-questions`) 🔐
+
+#### Gerenciamento de Perguntas (Admin)
+- `POST /admin` - Criar nova pergunta de segurança (requer permissão `security_questions:manage`)
+- `PUT /admin/{id}` - Atualizar pergunta de segurança (requer permissão `security_questions:manage`)
+- `DELETE /admin/{id}` - Excluir pergunta de segurança (requer permissão `security_questions:manage`)
+- `PUT /admin/{id}/deactivate` - Desativar pergunta de segurança (requer permissão `security_questions:manage`)
+
+#### Listagem e Consulta (Público)
+- `GET /` - Listar perguntas de segurança (filtrável: apenas ativas)
+- `GET /{id}` - Obter detalhes de pergunta específica
+
+#### Respostas de Usuário (Autenticado)
+- `POST /users/{user_id}/security-questions/{question_id}/answers` - Configurar resposta para pergunta de segurança
+- `GET /users/{user_id}/security-questions/answers` - Listar respostas configuradas pelo usuário
+- `POST /users/{user_id}/security-questions/{question_id}/verify` - Verificar resposta a uma pergunta
+- `DELETE /users/{user_id}/security-questions/{question_id}/answers` - Remover resposta específica
+- `DELETE /users/{user_id}/security-questions/answers` - Remover todas as respostas do usuário
+
+### Recuperação por Perguntas de Segurança (`/api/auth`) 🔑
+- `POST /security-questions` - Obter perguntas de segurança para um email
+- `POST /verify-security-question` - Verificar resposta à pergunta de segurança (para recuperação)
+
 ### Rota Raiz
 
 - `GET /` - Mensagem de boas-vindas e página de documentação da API
@@ -360,6 +385,32 @@ ADMIN_NAME=Administrador
 - created_at: DateTime
 - updated_at: DateTime
 
+### OAuthConnection
+- id: String
+- user_id: String
+- provider: String
+- provider_user_id: String
+- access_token: String
+- refresh_token: Option<String>
+- token_expires_at: Option<DateTime>
+- created_at: DateTime
+- updated_at: DateTime
+
+### SecurityQuestion
+- id: Uuid
+- text: String
+- active: bool
+- created_at: DateTime
+- updated_at: DateTime
+
+### UserSecurityAnswer
+- id: Uuid
+- user_id: Uuid
+- question_id: Uuid
+- answer_hash: String
+- created_at: DateTime
+- updated_at: DateTime
+
 ## Segurança 🛡️
 
 - Senhas são armazenadas com hash bcrypt ou Argon2 (configurável)
@@ -384,6 +435,7 @@ ADMIN_NAME=Administrador
 - Rastreamento de sessões ativas com informações detalhadas sobre cada dispositivo 🔍
 - Capacidade de revogar acesso a dispositivos específicos 🔒
 - Headers de segurança configuráveis como X-Content-Type-Options, X-Frame-Options, etc.
+- Perguntas de segurança para recuperação de conta com hashes Argon2 para respostas 🔐
 
 ## Gerenciamento de Dispositivos 📱
 
@@ -494,9 +546,11 @@ Para reportar bugs ou solicitar novas funcionalidades, abra uma issue no reposit
 - [x] Adicionar manutenção automática de sessões e tokens
 - [x] Implementar autenticação via OAuth
 - [x] Implementar cache de validação de token (Moka)
+- [x] Implementar sistema RBAC com gerenciamento de permissões e papéis
+- [x] Implementar perguntas de segurança para recuperação de conta
 - [ ] Adicionar suporte a múltiplos tenants
 - [ ] Implementar sistema de permissões granular
 - [ ] Adicionar suporte a múltiplos idiomas
 - [ ] Implementar cache de sessões
-- [ ] Adicionar suporte a webhooks
-- [ ] Adicionar autenticação com WebAuthn/FIDO2
+- [x] Adicionar suporte a webhooks
+- [x] Adicionar autenticação com WebAuthn/FIDO2

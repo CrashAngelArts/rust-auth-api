@@ -21,6 +21,7 @@ use moka::future::Cache;
 use crate::models::auth::TokenClaims; // Alterado de Session para TokenClaims
 use std::time::Duration;
 use crate::services::rbac_service::RbacService;
+use crate::services::security_question_service::SecurityQuestionService;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -95,6 +96,11 @@ async fn main() -> std::io::Result<()> {
     let rbac_service = RbacService::new(pool.clone());
     info!("✅ Serviço RBAC inicializado com sucesso");
 
+    // Inicializa o serviço de perguntas de segurança
+    let security_question_repo = repositories::security_question_repository::SqliteSecurityQuestionRepository::new(pool.clone());
+    let security_question_service = services::security_question_service::SecurityQuestionService::new(security_question_repo);
+    info!("✅ Serviço de perguntas de segurança inicializado com sucesso");
+
     // Configura os middlewares de segurança
     let (security_headers, _csrf_protection) = configure_security(&config.jwt.secret);
     
@@ -117,6 +123,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(email_service.clone()))
             .app_data(web::Data::new(token_cache.clone()))
             .app_data(web::Data::new(rbac_service.clone()))
+            .app_data(web::Data::new(security_question_service.clone()))
             .app_data(web::JsonConfig::default().limit(4096))
             .app_data(cookie_key.clone())
             // Servir arquivos estáticos da pasta 'static'

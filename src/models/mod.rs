@@ -10,3 +10,4 @@ pub mod device;
 pub mod oauth;
 pub mod role;
 pub mod permission;
+pub mod security_question;

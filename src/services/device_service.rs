@@ -4,8 +4,10 @@ use crate::models::auth::Session;
 use crate::models::device::{DeviceInfo, DeviceListResponse};
 use chrono::Utc;
 use rusqlite::params;
-use tracing::info;
+use tracing::{info, warn, error};
 use woothee::parser::Parser;
+use serde_json;
+use crate::config::Config;
 
 pub struct DeviceService;
 
@@ -227,6 +229,7 @@ impl DeviceService {
         ip_address: &Option<String>,
         user_agent: &Option<String>,
         duration_hours: i64,
+        config: &Config,
     ) -> Result<Session, ApiError> {
         let conn = pool.get()?;
         
@@ -247,41 +250,138 @@ impl DeviceService {
         };
         
         // Detectar tipo de dispositivo
-        let device_type = Self::detect_device_type(user_agent);
+        let device_type_info = Self::detect_device_type(user_agent);
+        let current_device_type = device_type_info.clone().unwrap_or_default(); // Para comparação
         
         // Gerar localização aproximada (simulada para este exemplo)
-        let location = if let Some(ip) = ip_address {
-            if ip.starts_with("192.168.") {
-                Some("Rede local".to_string())
+        // TODO: Implementar geolocalização de IP real usando biblioteca externa (ex: maxminddb)
+        //       e adicionar o campo `location` à migration da tabela `sessions`.
+        let location: Option<String> = if let Some(ip_addr) = ip_address {
+            if ip_addr.starts_with("192.168.") || ip_addr.starts_with("10.") || ip_addr == "::1" || ip_addr == "127.0.0.1" {
+                Some("Rede Local 🏠".to_string())
             } else {
-                Some("Localização desconhecida".to_string())
+                // Simulação - substitua por chamada de geolocalização
+                Some("Desconhecida 🌍".to_string())
             }
         } else {
             None
         };
         
         // Gerar nome amigável para o dispositivo
-        let device_name = Self::generate_device_name(&device_type, &location);
+        let device_name = Self::generate_device_name(&device_type_info, &location);
         
-        // Inserir a sessão no banco de dados com informações de dispositivo
-        let _now_str = now.to_rfc3339(); // Variável usada apenas para fins de documentação
+        // --- ANÁLISE DE RISCO --- 
+        const RISK_THRESHOLD_HIGH: i32 = 3;
+        const RISK_THRESHOLD_MEDIUM: i32 = 2;
+
+        let mut risk_score: i32 = 0;
+        let mut risk_factors = Vec::new();
+
+        // 1. Buscar histórico recente de sessões do usuário
+        let recent_sessions = Self::get_recent_sessions(pool, user_id, 5)?; // Buscar as últimas 5 sessões
+
+        let mut is_new_device_heuristic = true; // Assumir que é novo até encontrar um UA igual (heurística)
+
+        if !recent_sessions.is_empty() {
+            let last_session = &recent_sessions[0];
+
+            // 2. Analisar mudança de IP
+            if ip != last_session.ip_address {
+                // TODO: Implementar verificação de geolocalização (mudança de país/cidade)
+                risk_score += 1;
+                risk_factors.push("Mudança de Endereço IP".to_string());
+                info!("🛡️ [Risco Login] Mudança de IP detectada para {}: {} -> {}", user_id, last_session.ip_address, ip);
+            }
+
+            // 3. Analisar mudança de Dispositivo (User Agent - Comparação Simples por enquanto)
+            if ua != last_session.user_agent {
+                 // TODO: Comparação mais inteligente de UAs usando woothee
+                 risk_score += 1;
+                 risk_factors.push("Mudança de Dispositivo/Navegador".to_string());
+                 info!("🛡️ [Risco Login] Mudança de User Agent detectada para {}: ... -> {}", user_id, ua);
+            } else {
+                is_new_device_heuristic = false; // Se UA for igual, provavelmente não é novo
+            }
+             
+            // 4. Analisar Horário
+            // TODO: Implementar análise baseada no histórico de horários do usuário
+            let current_hour = now.hour();
+            let is_weekend = now.weekday().number_from_monday() >= 6;
+            let is_late_night = current_hour < 6; // Madrugada
+            let is_outside_business_hours = current_hour < 8 || current_hour > 18;
+
+            if is_late_night || (is_weekend && is_outside_business_hours) {
+                risk_score += 1;
+                risk_factors.push("Login em Horário Incomum".to_string());
+                info!("🛡️ [Risco Login] Login em horário incomum detectado para {}: Hora {}, Fim de Semana: {}", user_id, current_hour, is_weekend);
+            }
+
+            // 5. Verificar se é um dispositivo completamente novo (baseado na heurística do UA)
+            if is_new_device_heuristic {
+                // Checar se *algum* registro no histórico recente tem o mesmo UA
+                let ua_exists_in_history = recent_sessions.iter().any(|s| s.user_agent == ua);
+                if !ua_exists_in_history {
+                    risk_score += 1; // Pontuação extra para dispositivo 100% novo
+                    risk_factors.push("Dispositivo Completamente Novo".to_string());
+                    info!("🛡️ [Risco Login] Primeiro login detectado para o User Agent '{}' do usuário {}", ua, user_id);
+                }
+            }
+
+        }
+
+        // --- FIM ANÁLISE DE RISCO ---
+
+        // --- Ação Baseada no Risco ---
+        if risk_score >= RISK_THRESHOLD_HIGH {
+            warn!("🚨 [Risco Login Elevado] Atividade suspeita detectada para usuário {}. Risco: {}, Fatores: {:?}", user_id, risk_score, risk_factors);
+            // Retornar erro indicando atividade suspeita
+            return Err(ApiError::SuspiciousLoginActivity("Atividade suspeita detectada. Verificação adicional necessária.".to_string()));
+        }
+
+        // Marcar se verificação extra é necessária (risco médio)
+        let requires_extra_verification = risk_score >= RISK_THRESHOLD_MEDIUM;
+        if requires_extra_verification {
+             info!("⚠️ [Risco Login Médio] Verificação adicional pode ser necessária para usuário {}. Risco: {}, Fatores: {:?}", user_id, risk_score, risk_factors);
+        }
+
+        // TODO: Adicionar migration SQL para os campos: risk_score INTEGER, risk_factors TEXT, location TEXT
+
+        // --- Limite de Sessões Ativas ---
+        if let Some(max_sessions) = config.security.session_max_active {
+            let active_sessions_count = Self::count_active_sessions(pool, user_id)?;
+            if active_sessions_count >= max_sessions {
+                // Revogar a sessão mais antiga
+                if let Some(oldest_session_id) = Self::get_oldest_active_session_id(pool, user_id)? {
+                    match Self::revoke_device(pool, &oldest_session_id, user_id) {
+                        Ok(_) => info!("🔒 Sessão mais antiga ({}) revogada para usuário {} devido ao limite de {} sessões.", oldest_session_id, user_id, max_sessions),
+                        Err(e) => error!("Erro ao revogar sessão antiga {}: {}", oldest_session_id, e),
+                    }
+                } 
+            }
+        }
+        // --- FIM Limite de Sessões ---
+
+        // Inserir a nova sessão no banco
+        // Garantir que risk_factors seja serializado corretamente (ex: JSON string)
+        let risk_factors_json = serde_json::to_string(&risk_factors).unwrap_or_else(|_| "[]".to_string());
+
         conn.execute(
-            "INSERT INTO sessions (id, user_id, ip_address, user_agent, expires_at, created_at, 
-                                  device_name, device_type, last_active_at, location, is_current, is_active)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            "INSERT INTO sessions (id, user_id, ip_address, user_agent, device_name, device_type, location, is_current, expires_at, created_at, last_activity_at, risk_score, risk_factors)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             params![
                 &session.id,
                 &session.user_id,
                 &session.ip_address,
                 &session.user_agent,
-                &session.expires_at.to_rfc3339(),
-                &session.created_at.to_rfc3339(),
                 &device_name,
-                &device_type,
-                &session.last_activity_at.to_rfc3339(),
+                &device_type_info, // Usar a info detectada
                 &location,
                 true, // Marcar como dispositivo atual
-                &session.is_active
+                &session.expires_at,
+                &session.created_at,
+                &session.last_activity_at,
+                &risk_score,
+                &risk_factors_json // Salvar como JSON string
             ],
         )?;
         
@@ -294,5 +394,74 @@ impl DeviceService {
         info!("📱 Nova sessão criada para o dispositivo: {}", device_name);
         
         Ok(session)
+    }
+    
+    // Obtém as sessões mais recentes de um usuário
+    pub fn get_recent_sessions(pool: &DbPool, user_id: &str, limit: i64) -> Result<Vec<Session>, ApiError> {
+        let conn = pool.get()?;
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, user_id, ip_address, user_agent, expires_at, created_at, last_activity_at, is_active, risk_score, risk_factors
+             FROM sessions
+             WHERE user_id = ?1
+             ORDER BY created_at DESC
+             LIMIT ?2"
+        )?;
+        
+        let session_iter = stmt.query_map(params![user_id, limit], |row| {
+            let risk_factors_json: Option<String> = row.get(9)?;
+            let risk_factors = risk_factors_json
+                .map(|json| serde_json::from_str(&json).unwrap_or_else(|_| Vec::new()))
+                .unwrap_or_else(Vec::new);
+                
+            Ok(Session {
+                id: row.get(0)?,
+                user_id: row.get(1)?,
+                ip_address: row.get(2)?,
+                user_agent: row.get(3)?,
+                expires_at: row.get(4)?,
+                created_at: row.get(5)?,
+                last_activity_at: row.get(6)?,
+                is_active: row.get(7)?,
+                risk_score: row.get(8)?,
+                risk_factors: Some(risk_factors),
+            })
+        })?;
+        
+        let sessions = session_iter.collect::<Result<Vec<Session>, _>>()?;
+        
+        Ok(sessions)
+    }
+
+    // Conta as sessões ativas de um usuário
+    fn count_active_sessions(pool: &DbPool, user_id: &str) -> Result<u32, ApiError> {
+        let conn = pool.get()?;
+        let now = Utc::now();
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sessions WHERE user_id = ?1 AND expires_at > ?2",
+            params![user_id, now],
+            |row| row.get(0),
+        )?;
+        Ok(count as u32)
+    }
+
+    // Obtém o ID da sessão ativa mais antiga de um usuário
+    fn get_oldest_active_session_id(pool: &DbPool, user_id: &str) -> Result<Option<String>, ApiError> {
+        let conn = pool.get()?;
+        let now = Utc::now();
+        let result = conn.query_row(
+            "SELECT id FROM sessions 
+             WHERE user_id = ?1 AND expires_at > ?2 
+             ORDER BY created_at ASC 
+             LIMIT 1",
+            params![user_id, now],
+            |row| row.get(0),
+        );
+
+        match result {
+            Ok(id) => Ok(Some(id)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None), // Nenhuma sessão ativa encontrada
+            Err(e) => Err(ApiError::DatabaseError(e.to_string())),
+        }
     }
 }

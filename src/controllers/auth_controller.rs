@@ -8,9 +8,27 @@ use crate::models::auth::{
 use crate::models::response::ApiResponse;
 use crate::models::user::UserResponse;
 use crate::services::{auth_service::AuthService, email_service::EmailService, user_service::UserService};
+use crate::services::security_question_service::SecurityQuestionService; // Importar serviço de perguntas de segurança
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use tracing::{error, warn};
 use validator::Validate;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+
+// Novos DTOs para perguntas de segurança na recuperação de senha
+#[derive(Debug, Deserialize, Validate)]
+pub struct GetSecurityQuestionsDto {
+    #[validate(email(message = "Email inválido"))]
+    pub email: String,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct VerifySecurityQuestionDto {
+    #[validate(email(message = "Email inválido"))]
+    pub email: String,
+    pub question_id: String,
+    pub answer: String,
+}
 
 // Registra um novo usuário
 pub async fn register(
@@ -183,4 +201,75 @@ pub async fn me(
 
     // Retorna a resposta
     Ok(HttpResponse::Ok().json(ApiResponse::success(user_response)))
+}
+
+// Novo endpoint para obter perguntas de segurança para um email
+pub async fn get_security_questions(
+    pool: web::Data<DbPool>,
+    dto: web::Json<GetSecurityQuestionsDto>,
+    security_question_service: web::Data<SecurityQuestionService>,
+) -> Result<impl Responder, ApiError> {
+    // Valida os dados de entrada
+    dto.validate()?;
+
+    // Obter perguntas de segurança para o usuário
+    match AuthService::get_security_questions_for_recovery(&pool, &dto.email, &security_question_service) {
+        Ok(questions) => {
+            // Formatar as perguntas para o frontend
+            let formatted_questions: Vec<serde_json::Value> = questions
+                .into_iter()
+                .map(|(id, text)| {
+                    json!({
+                        "id": id.to_string(),
+                        "text": text
+                    })
+                })
+                .collect();
+
+            Ok(HttpResponse::Ok().json(json!({
+                "questions": formatted_questions,
+                "message": "Perguntas de segurança disponíveis 🔐"
+            })))
+        },
+        Err(e) => {
+            // Converter NotFound para um erro mais genérico para evitar enumeração de usuários
+            match e {
+                ApiError::NotFound(_) => {
+                    Ok(HttpResponse::Ok().json(json!({
+                        "questions": [],
+                        "message": "Nenhuma pergunta de segurança encontrada 🔍"
+                    })))
+                },
+                _ => Err(e),
+            }
+        }
+    }
+}
+
+// Novo endpoint para verificar resposta a uma pergunta de segurança
+pub async fn verify_security_question(
+    pool: web::Data<DbPool>,
+    dto: web::Json<VerifySecurityQuestionDto>,
+    security_question_service: web::Data<SecurityQuestionService>,
+) -> Result<impl Responder, ApiError> {
+    // Valida os dados de entrada
+    dto.validate()?;
+
+    // Verificar a resposta
+    let is_valid = AuthService::verify_security_question_for_reset(
+        &pool,
+        &dto.email,
+        &dto.question_id,
+        &dto.answer,
+        &security_question_service,
+    )?;
+
+    Ok(HttpResponse::Ok().json(json!({
+        "verified": is_valid,
+        "message": if is_valid { 
+            "Resposta verificada com sucesso ✅" 
+        } else { 
+            "Resposta incorreta ❌" 
+        }
+    })))
 }

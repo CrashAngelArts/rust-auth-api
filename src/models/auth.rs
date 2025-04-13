@@ -36,10 +36,29 @@ pub struct ForgotPasswordDto {
     pub email: String,
 }
 
+// Adicionar função de validação customizada
+fn validate_recovery_method(dto: &ResetPasswordDto) -> Result<(), validator::ValidationError> {
+    match (&dto.token, &dto.recovery_code) {
+        (Some(_), Some(_)) => Err(validator::ValidationError::new("use_only_one_recovery_method")),
+        (None, None) => Err(validator::ValidationError::new("no_recovery_method_provided")),
+        _ => Ok(()),
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Validate)]
+#[validate(schema(function = "validate_recovery_method"))]
 pub struct ResetPasswordDto {
-    #[validate(length(min = 1, message = "Token é obrigatório"))]
-    pub token: String,
+    // Token recebido por email (opcional)
+    #[validate(length(min = 1, message = "Token é obrigatório se não usar código de recuperação"))]
+    pub token: Option<String>,
+
+    // Código único de recuperação (opcional)
+    #[validate(length(min = 24, message = "Código de recuperação deve ter 24 caracteres"))] // Ajuste o tamanho se necessário
+    pub recovery_code: Option<String>,
+    
+    // Email do usuário (necessário se usar recovery_code para encontrar o usuário)
+    #[validate(email(message = "Email inválido"))]
+    pub email: String, // Adicionado para identificar o usuário com recovery_code
 
     #[validate(length(min = 8, message = "Senha deve ter pelo menos 8 caracteres"))]
     pub password: String,
@@ -56,11 +75,6 @@ pub struct TokenClaims {
     pub is_admin: bool,     // Flag de administrador
     pub exp: usize,         // Timestamp de expiração
     pub iat: usize,         // Timestamp de emissão
-    pub aud: Option<Vec<String>>, // Audiência do token (quem deve aceitá-lo)
-    pub iss: Option<String>, // Emissor do token (quem o criou)
-    pub jti: String,        // ID único do token (para blacklist)
-    pub fam: String,        // Família do token (para invalidação em cadeia)
-    pub tfv: Option<bool>,  // Flag de verificação 2FA
 }
 
 #[derive(Debug, Serialize, Deserialize)]
