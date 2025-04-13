@@ -8,7 +8,7 @@ use chrono::Utc;
 use chrono::DateTime;
 use rusqlite::{params, OptionalExtension}; // Importar OptionalExtension
 use tracing::{error, info};
-use uuid::Uuid; // Importar Uuid
+ // Importar Uuid
 
 pub struct RbacService;
 

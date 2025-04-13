@@ -1,5 +1,4 @@
 use crate::errors::ApiError;
-use crate::models::user::User;
 use crate::models::keystroke_dynamics::{KeystrokeStatusResponse, KeystrokeVerificationResponse};
 use crate::db::DbPool;
 use chrono::Utc;

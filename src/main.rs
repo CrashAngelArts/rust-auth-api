@@ -10,9 +10,6 @@ mod services;
 mod utils;
 
 use actix_web::{App, HttpServer, web};
-use actix_session::storage::CookieSessionStore;
-use actix_session::SessionMiddleware;
-use actix_session::config::CookieContentSecurity;
 use actix_web::cookie::Key;
 use actix_files::Files; // Adicionado para servir arquivos estáticos
 use dotenv::dotenv;

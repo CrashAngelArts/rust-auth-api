@@ -9,7 +9,7 @@ use crate::{
 use actix_web::{
     delete, get, post, put,
     web::{self, Data, Json, Path},
-    HttpResponse, Scope,
+    HttpResponse,
 };
 use validator::Validate;
 use serde::Serialize;

@@ -1,6 +1,6 @@
 use actix_web::{
     body::MessageBody,
-    cookie::{time::Duration, Cookie, SameSite},
+    cookie::{Cookie, SameSite},
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
     http::{header, Method, StatusCode},
     Error, HttpMessage, HttpResponse, ResponseError,
@@ -9,7 +9,7 @@ use base64::{engine::general_purpose::URL_SAFE_NO_PAD as B64_ENGINE, Engine as _
 use futures_util::future::{self, LocalBoxFuture, Ready};
 use rand::{rngs::OsRng, RngCore};
 use ring::constant_time;
-use std::{fmt, rc::Rc, task::{Context, Poll}};
+use std::rc::Rc;
 use thiserror::Error;
 use crate::config::Config;
 
