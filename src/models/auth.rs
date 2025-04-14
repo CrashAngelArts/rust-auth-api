@@ -1,7 +1,19 @@
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use validator::Validate;
+use validator::{Validate, ValidationError, ValidationErrors};
+
+// Custom validation function to ensure either token or recovery_code is present
+fn validate_reset_method(dto: &ResetPasswordDto) -> Result<(), ValidationError> {
+    if dto.token.is_none() && dto.recovery_code.is_none() {
+        let mut error = ValidationError::new("either_token_or_recovery_code_required");
+        error.message = Some("Either 'token' or 'recovery_code' must be provided.".into());
+        Err(error)
+    } else {
+        Ok(())
+    }
+}
+
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct LoginDto {
@@ -37,9 +49,14 @@ pub struct ForgotPasswordDto {
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
+#[validate(schema(function = "validate_reset_method"))] // Apply custom validation
 pub struct ResetPasswordDto {
-    #[validate(length(min = 1, message = "Token é obrigatório"))]
-    pub token: String,
+    // Token from email (optional)
+    pub token: Option<String>,
+
+    // Recovery code (optional)
+    #[validate(length(equal = 24, message = "Recovery code must be 24 characters long"))]
+    pub recovery_code: Option<String>,
 
     #[validate(length(min = 8, message = "Senha deve ter pelo menos 8 caracteres"))]
     pub password: String,

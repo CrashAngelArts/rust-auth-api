@@ -1,8 +1,8 @@
 use crate::db::DbPool;
 use crate::errors::ApiError;
 use crate::models::response::ApiResponse;
-use crate::models::two_factor::{Enable2FADto, Verify2FADto, Disable2FADto};
-use crate::services::{user_service::UserService, two_factor_service::TwoFactorService};
+use crate::models::two_factor::{Enable2FADto, Verify2FADto, Disable2FADto, TwoFactorEnabledResponse}; // Importar TwoFactorEnabledResponse
+use crate::services::{user_service::UserService, two_factor_service::TwoFactorService, auth_service::AuthService}; // Importar AuthService
 use actix_web::{web, HttpResponse, Responder};
 use tracing::info;
 use validator::Validate;
@@ -59,11 +59,24 @@ pub async fn enable_2fa(
         None => return Err(ApiError::BadRequestError("Configure o 2FA primeiro".to_string())),
     };
     
-    // Ativar 2FA
-    let response = TwoFactorService::enable_2fa(&pool, &user_id, &data.totp_code, totp_secret)?;
+    // Ativar 2FA - Isso retorna os códigos de backup
+    let two_factor_response: TwoFactorEnabledResponse = TwoFactorService::enable_2fa(&pool, &user_id, &data.totp_code, totp_secret)?;
+
+    // Gerar e definir o código de recuperação único
+    let recovery_code = AuthService::generate_and_set_recovery_code(&pool, &user_id)?;
     
-    // Retornar a resposta
-    Ok(HttpResponse::Ok().json(ApiResponse::success(response)))
+    // Construir a resposta final combinando códigos de backup e código de recuperação
+    let final_response = serde_json::json!({
+        "message": "Autenticação de dois fatores ativada com sucesso",
+        "enabled": true,
+        "backup_codes": two_factor_response.backup_codes, // Códigos de backup do 2FA
+        "recovery_code": recovery_code // Código de recuperação único
+    });
+
+    info!("✅ 2FA ativado e código de recuperação gerado para o usuário: {}", user.username);
+
+    // Retornar a resposta combinada
+    Ok(HttpResponse::Ok().json(ApiResponse::success(final_response)))
 }
 
 // Desativa 2FA
@@ -156,6 +169,6 @@ pub async fn get_2fa_status(
     // Retornar o status
     Ok(HttpResponse::Ok().json(ApiResponse::success(serde_json::json!({
         "enabled": user.totp_enabled,
-        "created_at": user.updated_at.to_rfc3339()
+        "created_at": user.updated_at.to_rfc3339() // Usar updated_at pode ser mais relevante para quando foi ativado/desativado
     }))))
 }

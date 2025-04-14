@@ -18,6 +18,7 @@ use rand::{thread_rng, Rng};
 use sha2::{Digest, Sha256};
 use uuid::Uuid; // Importar Uuid
 use moka::future::Cache; // Importar Moka Cache
+use std::collections::HashMap; // Importar HashMap
 
 pub struct AuthService;
 
@@ -30,8 +31,9 @@ impl AuthService {
     ) -> Result<User, ApiError> {
         // Verifica se as senhas coincidem
         if register_dto.password != register_dto.confirm_password {
-            // Usar BadRequestError ou criar uma variante específica seria melhor
-            return Err(ApiError::ValidationError(std::collections::HashMap::new()));
+            let mut errors = HashMap::new();
+            errors.insert("confirm_password".to_string(), vec!["As senhas não coincidem".to_string()]);
+            return Err(ApiError::ValidationError(errors));
         }
         // Cria o DTO para criação de usuário
         let create_dto = CreateUserDto {
@@ -380,7 +382,7 @@ impl AuthService {
         Ok(())
     }
 
-    // Redefine a senha
+    // Redefine a senha usando token de email ou código de recuperação
     pub fn reset_password(
         pool: &DbPool,
         reset_dto: ResetPasswordDto,
@@ -388,67 +390,118 @@ impl AuthService {
     ) -> Result<(), ApiError> {
         // Verifica se as senhas coincidem
         if reset_dto.password != reset_dto.confirm_password {
-            // Usar BadRequestError ou criar uma variante específica seria melhor
-            return Err(ApiError::ValidationError(std::collections::HashMap::new()));
+             let mut errors = HashMap::new();
+             errors.insert("confirm_password".to_string(), vec!["As senhas não coincidem".to_string()]); // Corrigido aqui
+             return Err(ApiError::ValidationError(errors));
         }
 
-        // Obtém o token de recuperação
         let conn = pool.get()?;
+        let mut user_id_to_reset: Option<String> = None;
+        let mut token_id_to_delete: Option<String> = None;
+        let mut used_recovery_code = false;
 
-        let token_result = conn.query_row(
-            "SELECT id, user_id, token, expires_at, created_at
-             FROM password_reset_tokens
-             WHERE token = ?1",
-            [&reset_dto.token],
-            |row| {
-                Ok(PasswordResetToken {
-                    id: row.get(0)?,
-                    user_id: row.get(1)?,
-                    token: row.get(2)?,
-                    expires_at: row.get(3)?,
-                    created_at: row.get(4)?,
-                })
-            },
-        );
-
-        let token = match token_result {
-            Ok(token) => token,
-            Err(_) => {
-                // Usar AuthenticationError ou NotFoundError seria mais apropriado
-                return Err(ApiError::ValidationError(std::collections::HashMap::new()));
+        // Tenta verificar usando o código de recuperação primeiro
+        if let Some(code) = &reset_dto.recovery_code {
+            match Self::verify_recovery_code(pool, code) {
+                Ok(user) => {
+                    user_id_to_reset = Some(user.id.clone());
+                    used_recovery_code = true;
+                    info!("🔑 Verificação por código de recuperação bem-sucedida para: {}", user.username);
+                }
+                Err(ApiError::AuthenticationError(msg)) => {
+                    warn!("🔑 Falha na verificação do código de recuperação: {}", msg);
+                    // Não retorna erro ainda, pode tentar o token de email
+                }
+                Err(e) => return Err(e), // Erro de banco ou outro erro interno
             }
-        };
-
-        // Verifica se o token está expirado
-        if token.is_expired() {
-            // Remove o token expirado
-            conn.execute("DELETE FROM password_reset_tokens WHERE id = ?1", [&token.id])?;
-
-            // Usar AuthenticationError seria mais apropriado
-            return Err(ApiError::ValidationError(std::collections::HashMap::new()));
         }
 
-        // Obtém o usuário
-        let user = UserService::get_user_by_id(pool, &token.user_id)?;
+        // Se não usou código de recuperação ou falhou, tenta o token de email
+        if user_id_to_reset.is_none() {
+            if let Some(token_str) = &reset_dto.token {
+                let token_result = conn.query_row(
+                    "SELECT id, user_id, token, expires_at, created_at
+                     FROM password_reset_tokens
+                     WHERE token = ?1",
+                    [token_str],
+                    |row| {
+                        Ok(PasswordResetToken {
+                            id: row.get(0)?,
+                            user_id: row.get(1)?,
+                            token: row.get(2)?,
+                            expires_at: row.get(3)?,
+                            created_at: row.get(4)?,
+                        })
+                    },
+                );
+
+                match token_result {
+                    Ok(token) => {
+                        if token.is_expired() {
+                            warn!("🔑 Token de redefinição de senha expirado: {}", token.token);
+                            conn.execute("DELETE FROM password_reset_tokens WHERE id = ?1", [&token.id])?;
+                            return Err(ApiError::AuthenticationError("Token expirado".to_string()));
+                        }
+                        user_id_to_reset = Some(token.user_id.clone());
+                        token_id_to_delete = Some(token.id.clone()); // Marcar token para exclusão
+                        info!("🔑 Verificação por token de email bem-sucedida para usuário ID: {}", token.user_id);
+                    }
+                    Err(rusqlite::Error::QueryReturnedNoRows) => {
+                        warn!("🔑 Token de redefinição de senha inválido: {}", token_str);
+                        // Se ambos falharam, retorna erro
+                        if reset_dto.recovery_code.is_some() {
+                             return Err(ApiError::AuthenticationError("Código de recuperação ou token inválido/expirado".to_string()));
+                        } else {
+                             return Err(ApiError::AuthenticationError("Token inválido/expirado".to_string()));
+                        }
+                    }
+                    Err(e) => return Err(ApiError::from(e)),
+                }
+            } else {
+                // Se nenhum método foi fornecido (embora a validação do DTO deva pegar isso)
+                 return Err(ApiError::BadRequest("Nenhum método de redefinição (token ou código) fornecido".to_string()));
+            }
+        }
+
+        // Se chegamos aqui, temos um user_id válido
+        let user_id = user_id_to_reset.ok_or_else(|| {
+             // Este caso não deve acontecer devido às verificações anteriores, mas é bom ter
+             ApiError::InternalServerError("Falha ao determinar o usuário para redefinição".to_string())
+        })?;
+
+        // Obtém o usuário (para log e invalidação)
+        let user = UserService::get_user_by_id(pool, &user_id)?;
 
         // Atualiza a senha
-        UserService::update_password(pool, &user.id, &reset_dto.password, salt_rounds)?;
+        UserService::update_password(pool, &user_id, &reset_dto.password, salt_rounds)?;
 
-        // Remove o token usado
-        conn.execute("DELETE FROM password_reset_tokens WHERE id = ?1", [&token.id])?;
+        // Limpa o método de recuperação usado
+        if used_recovery_code {
+            // Limpa o código de recuperação do usuário
+            conn.execute(
+                "UPDATE users SET recovery_code = NULL, recovery_code_expires_at = NULL, updated_at = ?1 WHERE id = ?2",
+                (&Utc::now(), &user_id),
+            )?;
+            info!("🔑 Código de recuperação consumido para o usuário: {}", user.username);
+        } else if let Some(token_id) = token_id_to_delete {
+            // Remove o token de email usado
+            conn.execute("DELETE FROM password_reset_tokens WHERE id = ?1", [&token_id])?;
+            info!("🔑 Token de redefinição de senha consumido para o usuário: {}", user.username);
+        }
 
         // Invalida todas as sessões do usuário
         conn.execute(
             "DELETE FROM sessions WHERE user_id = ?1",
-            [&user.id],
+            [&user_id],
         )?;
 
         // Revoga todos os refresh tokens do usuário
-        Self::revoke_all_user_refresh_tokens(pool, &user.id)?;
+        Self::revoke_all_user_refresh_tokens(pool, &user_id)?;
 
         info!("🔑 Senha redefinida com sucesso para o usuário: {}", user.username);
         Ok(())
     }
+
 
     // Gera um novo access token usando um refresh token
     pub fn refresh_token(
@@ -531,7 +584,9 @@ impl AuthService {
             Err(rusqlite::Error::QueryReturnedNoRows) => {
                 warn!("🔓 Tentativa de desbloqueio com token inválido: {}", unlock_dto.token);
                 // Usar AuthenticationError ou NotFoundError
-                return Err(ApiError::ValidationError(std::collections::HashMap::new()));
+                let mut errors = HashMap::new();
+                errors.insert("token".to_string(), vec!["Token inválido".to_string()]);
+                return Err(ApiError::ValidationError(errors));
             }
             Err(e) => return Err(ApiError::from(e)),
         };
@@ -546,13 +601,17 @@ impl AuthService {
                     (&Utc::now(), &user.id),
                  )?;
                  // Usar AuthenticationError
-                 return Err(ApiError::ValidationError(std::collections::HashMap::new()));
+                 let mut errors = HashMap::new();
+                 errors.insert("token".to_string(), vec!["Token expirado".to_string()]);
+                 return Err(ApiError::ValidationError(errors));
             }
         } else {
             // Se não há data de expiração, mas há token, algo está errado. Considerar inválido.
              warn!("🔓 Token de desbloqueio sem data de expiração para: {}", user.username);
              // Usar AuthenticationError
-             return Err(ApiError::ValidationError(std::collections::HashMap::new()));
+             let mut errors = HashMap::new();
+             errors.insert("token".to_string(), vec!["Token inválido".to_string()]);
+             return Err(ApiError::ValidationError(errors));
         }
 
         // 3. Desbloqueia a conta e limpa os campos relacionados
@@ -927,6 +986,112 @@ impl AuthService {
             requires_email_verification: false, // Por padrão não requer verificação de email 📫
         };
         Ok(auth_response)
+    }
+
+    /// Generates a unique recovery code for a user and updates the database.
+    /// Returns the generated code.
+    pub fn generate_and_set_recovery_code(
+        pool: &DbPool,
+        user_id: &str,
+    ) -> Result<String, ApiError> {
+        let conn = pool.get()?;
+
+        // 1. Generate the code
+        let code_length = 24; // Consider making this configurable
+        let recovery_code = Self::generate_recovery_code_internal(code_length);
+
+        // 2. Update the user record - Set expiration to NULL (never expires until used/regenerated)
+        let rows_affected = conn.execute(
+            "UPDATE users SET recovery_code = ?1, recovery_code_expires_at = NULL, updated_at = ?2 WHERE id = ?3",
+            (
+                &recovery_code,
+                &Utc::now(),
+                user_id,
+            ),
+        )?;
+
+        if rows_affected == 0 {
+            error!("Failed to set recovery code for user ID: {}. User not found.", user_id);
+            return Err(ApiError::NotFoundError(format!("User not found: {}", user_id)));
+        }
+
+        info!("🔑 Recovery code generated and set for user ID: {}", user_id);
+
+        // 3. Return the generated code
+        Ok(recovery_code)
+    }
+
+    /// Verifies a recovery code and returns the associated user if valid.
+    /// Does not consume the code.
+    pub fn verify_recovery_code(
+        pool: &DbPool,
+        recovery_code: &str,
+    ) -> Result<User, ApiError> {
+        let conn = pool.get()?;
+
+        let user_result = conn.query_row(
+            "SELECT id, email, username, password_hash, first_name, last_name, is_active, is_admin, created_at, updated_at, failed_login_attempts, locked_until, unlock_token, unlock_token_expires_at, totp_secret, totp_enabled, backup_codes, token_family, recovery_email, recovery_code, recovery_code_expires_at
+             FROM users
+             WHERE recovery_code = ?1",
+            [recovery_code],
+            |row| {
+                Ok(User {
+                    id: row.get(0)?,
+                    email: row.get(1)?,
+                    username: row.get(2)?,
+                    password_hash: row.get(3)?,
+                    first_name: row.get(4)?,
+                    last_name: row.get(5)?,
+                    is_active: row.get(6)?,
+                    is_admin: row.get(7)?,
+                    created_at: row.get(8)?,
+                    updated_at: row.get(9)?,
+                    failed_login_attempts: row.get(10)?,
+                    locked_until: row.get(11)?,
+                    unlock_token: row.get(12)?,
+                    unlock_token_expires_at: row.get(13)?,
+                    totp_secret: row.get(14)?,
+                    totp_enabled: row.get(15)?,
+                    backup_codes: row.get(16)?,
+                    token_family: row.get(17)?,
+                    recovery_email: row.get(18)?,
+                    recovery_code: row.get(19)?,
+                    recovery_code_expires_at: row.get(20)?,
+                    roles: Vec::new(), // Roles need to be fetched separately if needed
+                })
+            },
+        );
+
+        match user_result {
+            Ok(user) => {
+                // Optionally, check if the code has an expiration date and if it's expired
+                // if let Some(expires_at) = user.recovery_code_expires_at {
+                //     if expires_at < Utc::now() {
+                //         warn!("🔑 Recovery code expired for user: {}", user.username);
+                //         return Err(ApiError::AuthenticationError("Recovery code expired".to_string()));
+                //     }
+                // }
+                info!("✅ Recovery code verified successfully for user: {}", user.username);
+                Ok(user)
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => {
+                warn!("🔑 Invalid recovery code provided: {}", recovery_code);
+                Err(ApiError::AuthenticationError("Invalid recovery code".to_string()))
+            }
+            Err(e) => {
+                error!("❌ Database error verifying recovery code: {}", e);
+                Err(ApiError::from(e))
+            }
+        }
+    }
+
+    // Helper function to generate the recovery code string
+    fn generate_recovery_code_internal(length: usize) -> String {
+        thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(length)
+            .map(char::from)
+            .collect()
     }
     
     // Método removido pois agora usamos a tabela recovery_emails

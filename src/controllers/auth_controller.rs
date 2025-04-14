@@ -136,13 +136,13 @@ pub async fn forgot_password(
 // Redefine a senha
 pub async fn reset_password(
     pool: web::Data<DbPool>,
-    reset_dto: web::Json<ResetPasswordDto>,
+    reset_dto: web::Json<ResetPasswordDto>, // DTO já está atualizado
     config: web::Data<Config>, // Usar Config importado
 ) -> Result<impl Responder, ApiError> {
-    // Valida os dados de entrada
+    // Valida os dados de entrada (incluindo a validação customizada)
     reset_dto.validate()?;
 
-    // Redefine a senha
+    // Redefine a senha usando o serviço atualizado
     AuthService::reset_password(&pool, reset_dto.into_inner(), config.security.password_salt_rounds)?;
 
     // Retorna a resposta
