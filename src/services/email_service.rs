@@ -248,8 +248,8 @@ impl EmailService {
                         <p style="text-align: center;"><a href="{unlock_link}" class="button">Desbloquear Minha Conta</a></p>
                         <p>Ou copie e cole o link abaixo no seu navegador:</p>
                         <p>{unlock_link}</p>
-                        <p>Este código/link expirará em breve. Se você não solicitou isso ou acredita que foi um erro, entre em contato com o suporte.</p>
-                        <p>Atenciosamente,<br>Equipe de Segurança</p>
+                        <p>Este link expirará em breve. Se você não solicitou isso, pode ignorar este email.</p>
+                        <p>Atenciosamente,<br>Equipe de Suporte</p>
                     </div>
                     <div class="footer"><p>Este é um email automático, por favor não responda.</p></div>
                 </div>
@@ -289,7 +289,7 @@ impl EmailService {
 
         self.send_email(
             &user.email,
-            "Sua conta foi temporariamente bloqueada",
+            "Conta Bloqueada Temporariamente",
             &text_body,
             &html_body,
         ).await // Adicionar await

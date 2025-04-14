@@ -9,7 +9,7 @@ use crate::models::user::{CreateUserDto, User};
 use crate::services::device_service::DeviceService;
 use crate::services::email_service::EmailService;
 use crate::services::user_service::UserService;
-use chrono::{Duration, Utc};
+use chrono::{Duration, Utc, DateTime, TimeZone};
 use hex;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use tracing::{error, info, warn};
@@ -19,6 +19,8 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid; // Importar Uuid
 use moka::future::Cache; // Importar Moka Cache
 use std::collections::HashMap; // Importar HashMap
+use rusqlite::OptionalExtension; // Mantido para outras queries
+use std::sync::Arc; // Mantido para as funções wrapper
 
 pub struct AuthService;
 
@@ -547,11 +549,16 @@ impl AuthService {
 
         // 1. Encontra o usuário pelo token de desbloqueio
         let user_result = conn.query_row(
-            "SELECT id, email, username, password_hash, first_name, last_name, is_active, is_admin, created_at, updated_at, failed_login_attempts, locked_until, unlock_token, unlock_token_expires_at, totp_secret, totp_enabled, backup_codes, token_family, recovery_email, recovery_code, recovery_code_expires_at
+            "SELECT id, email, username, password_hash, first_name, last_name, is_active, is_admin, created_at, updated_at, failed_login_attempts, locked_until, unlock_token, unlock_token_expires_at, totp_secret, totp_enabled, backup_codes, token_family, recovery_email, hashed_recovery_code, token_family, recovery_email, recovery_code, recovery_code_expires_at
              FROM users
              WHERE unlock_token = ?1",
             [&unlock_dto.token],
             |row| {
+                // Mapeamento interno para User dentro de unlock_account
+                 let get_datetime = |i: usize| -> Result<Option<DateTime<Utc>>, rusqlite::Error> {
+                    Ok(row.get::<_, Option<i64>>(i)?
+                        .and_then(|ts| Utc.timestamp_opt(ts, 0).single()))
+                 };
                 Ok(User {
                     id: row.get(0)?,
                     email: row.get(1)?,
@@ -561,20 +568,19 @@ impl AuthService {
                     last_name: row.get(5)?,
                     is_active: row.get(6)?,
                     is_admin: row.get(7)?,
-                    created_at: row.get(8)?,
-                    updated_at: row.get(9)?,
+                    created_at: get_datetime(8)?.unwrap_or_else(|| Utc::now()),
+                    updated_at: get_datetime(9)?.unwrap_or_else(|| Utc::now()),
                     failed_login_attempts: row.get(10)?,
-                    locked_until: row.get(11)?,
+                    locked_until: get_datetime(11)?,
                     unlock_token: row.get(12)?,
-                    unlock_token_expires_at: row.get(13)?,
-                    totp_secret: row.get(14)?,          // Campo para 2FA
-                    totp_enabled: row.get(15)?,         // Campo para 2FA
-                    backup_codes: row.get(16)?,         // Campo para 2FA
-                    token_family: row.get(17)?,         // Campo para rotação de tokens
-                    recovery_email: row.get(18)?,       // Campo para email de recuperação
-                    recovery_code: row.get(19)?,        // Campo para código de recuperação
-                    recovery_code_expires_at: row.get(20)?, // Campo para expiração do código
-                    roles: Vec::new(), // <-- Adicionado: Inicializar roles como vazio
+                    unlock_token_expires_at: get_datetime(13)?,
+                    totp_secret: row.get(14)?,
+                    totp_enabled: row.get(15)?,
+                    backup_codes: row.get(16)?,
+                    token_family: row.get(17)?,
+                    recovery_email: row.get(18)?,
+                    hashed_recovery_code: row.get(19)?,
+                    roles: Vec::new(),
                 })
             },
         );
@@ -1030,7 +1036,7 @@ impl AuthService {
         let conn = pool.get()?;
 
         let user_result = conn.query_row(
-            "SELECT id, email, username, password_hash, first_name, last_name, is_active, is_admin, created_at, updated_at, failed_login_attempts, locked_until, unlock_token, unlock_token_expires_at, totp_secret, totp_enabled, backup_codes, token_family, recovery_email, recovery_code, recovery_code_expires_at
+            "SELECT id, email, username, password_hash, first_name, last_name, is_active, is_admin, created_at, updated_at, failed_login_attempts, locked_until, unlock_token, unlock_token_expires_at, totp_secret, totp_enabled, backup_codes, token_family, recovery_email, hashed_recovery_code, token_family, recovery_email, recovery_code, recovery_code_expires_at
              FROM users
              WHERE recovery_code = ?1",
             [recovery_code],
@@ -1055,9 +1061,8 @@ impl AuthService {
                     backup_codes: row.get(16)?,
                     token_family: row.get(17)?,
                     recovery_email: row.get(18)?,
-                    recovery_code: row.get(19)?,
-                    recovery_code_expires_at: row.get(20)?,
-                    roles: Vec::new(), // Roles need to be fetched separately if needed
+                    hashed_recovery_code: row.get(19)?,
+                    roles: Vec::new(),
                 })
             },
         );
