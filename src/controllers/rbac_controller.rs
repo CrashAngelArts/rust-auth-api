@@ -6,6 +6,7 @@ use crate::models::{
 };
 use crate::services::rbac_service::RbacService;
 use crate::middleware::permission::PermissionAuth;
+use serde::Serialize;
 
 // --- Funções Handler para Permissões ---
 

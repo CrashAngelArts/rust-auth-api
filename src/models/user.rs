@@ -35,6 +35,11 @@ pub struct User {
     // Campo para rotação de tokens JWT
     #[serde(skip_serializing)] // Não expor a família de tokens
     pub token_family: Option<String>,
+    // Campos para código único de recuperação
+    #[serde(skip_serializing)] // Não expor o código de recuperação
+    pub recovery_code: Option<String>,
+    #[serde(skip_serializing)] // Não expor a expiração do código
+    pub recovery_code_expires_at: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub roles: Vec<Role>,
 }
@@ -68,6 +73,8 @@ impl User {
             totp_enabled: false,      // 2FA desabilitado por padrão
             backup_codes: None,       // Inicializa sem códigos de backup
             token_family: Some(Uuid::new_v4().to_string()), // Cria uma nova família de tokens
+            recovery_code: None,      // Inicializa sem código de recuperação
+            recovery_code_expires_at: None, // Inicializa sem expiração do código
             roles: Vec::new(),
         }
     }

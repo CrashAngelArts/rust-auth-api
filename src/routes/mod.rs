@@ -11,7 +11,7 @@ use crate::controllers::{
     recovery_email_controller, // Novo controlador de emails de recuperação 📧
     oauth_controller, // Novo controlador de autenticação OAuth 🔑
     rbac_controller, // <-- Adicionar import para rbac_controller
-    security_question_controller, // <-- Novo controlador de perguntas de segurança 🔐
+    security_question_controller, // <-- Adicionar import para security_question_controller
 };
 use crate::middleware::{
     auth::{AdminAuth, JwtAuth},
@@ -47,7 +47,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
     
     // Configurar middleware específico para keystroke dynamics
     let keystroke_rate_limiter = KeystrokeRateLimiter::new(
-        config.security.keystroke_rate_limit_requests.unwrap_or(5) as usize,
+        config.security.keystroke_rate_limit_requests.unwrap_or(5),
         Duration::from_secs(config.security.keystroke_rate_limit_duration.unwrap_or(60)),
         Duration::from_secs(config.security.keystroke_block_duration.unwrap_or(300)),
     );
@@ -66,8 +66,6 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
             .wrap(request_logger)
             .wrap(rate_limiter) // Aplicar rate limiter a todas as rotas /api
             .wrap(csrf_protect) // <-- Aplicado middleware CSRF a todas as rotas /api 🛡️🍪
-            // Rota pública para verificar código de recuperação
-            .service(user_controller::verify_recovery_code_handler)
             .service(
                 web::scope("/auth")
                     .route("/register", web::post().to(auth_controller::register))
@@ -76,9 +74,6 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
                     .route("/reset-password", web::post().to(auth_controller::reset_password))
                     .route("/unlock", web::post().to(auth_controller::unlock_account)) // <-- Nova rota de desbloqueio
                     .route("/refresh", web::post().to(auth_controller::refresh_token)) // <-- Nova rota de refresh token
-                    // Novas rotas para perguntas de segurança
-                    .route("/security-questions", web::post().to(auth_controller::get_security_questions))
-                    .route("/verify-security-question", web::post().to(auth_controller::verify_security_question))
                     // Rotas para rotação de tokens
                     .route("/token/rotate", web::post().to(token_controller::rotate_token))
                     .route("/token/revoke", web::post().to(token_controller::revoke_token))
@@ -153,8 +148,6 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
                     )
                     // POST /users/{id}/change-password - Apenas o próprio usuário pode mudar a senha
                     .route("/{id}/change-password", web::post().to(user_controller::change_password))
-                    // Rota para gerar código único de recuperação (requer autenticação)
-                    .service(user_controller::generate_recovery_code_handler)
                     // Rotas para autenticação de dois fatores (2FA)
                     .service(
                         web::scope("/{id}/2fa")
@@ -204,12 +197,11 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
                     .wrap(jwt_auth.clone()) // Aplicar JwtAuth a todas as rotas /api/rbac
                     .configure(rbac_controller::configure_rbac_routes) // Usar .configure para registrar as rotas
             )
-            // Adicionar escopo para perguntas de segurança
+            // Rotas para perguntas de segurança
             .service(
                 web::scope("/security-questions")
-                    .wrap(jwt_auth.clone()) // Proteger todas as rotas com JWT
-                    .wrap(email_verification_check.clone()) // Exigir verificação de email
-                    .configure(security_question_controller::configure_security_question_routes)
+                    .wrap(jwt_auth.clone())
+                    .configure(security_question_controller::config) // Usar a função config para configurar as rotas
             ),
     )
     .service(

@@ -1,223 +1,250 @@
-use actix_web::{web, HttpResponse, Responder, Result as ActixResult, get, post, put, delete};
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+use actix_web::{delete, get, post, put, web, HttpResponse};
+use actix_web_grants::proc_macro::has_permissions;
+use actix_web_httpauth::extractors::bearer::BearerAuth;
+use crate::db::DbPool;
 use crate::errors::ApiError;
+use crate::models::security_question::{
+    CreateSecurityQuestionDto, CreateUserSecurityAnswerDto, UpdateSecurityQuestionDto
+};
 use crate::services::security_question_service::SecurityQuestionService;
-use crate::middleware::permission::PermissionAuth;
+use crate::utils::jwt::JwtUtils;
+use std::env;
+use validator::Validate;
 
-// ----- DTOs para Perguntas de Segurança -----
+// === Rotas para administradores (gerenciamento de perguntas) ===
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CreateSecurityQuestionDto {
-    pub text: String,
+#[post("/admin/questions")]
+#[has_permissions("ADMIN")]
+pub async fn create_question(
+    pool: web::Data<DbPool>,
+    _auth: BearerAuth,
+    dto: web::Json<CreateSecurityQuestionDto>,
+) -> Result<HttpResponse, ApiError> {
+    // Validar DTO
+    dto.validate()?;
+    
+    // Processar a requisição
+    let question = SecurityQuestionService::create_question(&pool, dto.into_inner())?;
+    
+    Ok(HttpResponse::Created().json(question))
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct UpdateSecurityQuestionDto {
-    pub text: String,
-    pub active: bool,
+#[get("/admin/questions/{id}")]
+#[has_permissions("ADMIN")]
+pub async fn get_question(
+    pool: web::Data<DbPool>,
+    _auth: BearerAuth,
+    path: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    let id = path.into_inner();
+    let question = SecurityQuestionService::get_question_by_id(&pool, &id)?;
+    
+    Ok(HttpResponse::Ok().json(question))
 }
 
-// ----- DTOs para Respostas de Usuários -----
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SetUserAnswerDto {
-    pub answer: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct VerifyAnswerDto {
-    pub answer: String,
-}
-
-// ----- Handlers para Perguntas de Segurança -----
-
-#[post("/security-questions")]
-pub async fn create_security_question_handler(
-    service: web::Data<SecurityQuestionService>,
-    dto: web::Json<CreateSecurityQuestionDto>
-) -> ActixResult<impl Responder> {
-    let new_question = service.create_security_question(dto.text.clone())?;
-    Ok(web::Json(new_question))
-}
-
-#[get("/security-questions")]
-pub async fn list_security_questions_handler(
-    service: web::Data<SecurityQuestionService>,
+#[get("/admin/questions")]
+#[has_permissions("ADMIN")]
+pub async fn list_questions(
+    pool: web::Data<DbPool>,
+    _auth: BearerAuth,
     query: web::Query<ListQuestionsQuery>,
-) -> ActixResult<impl Responder> {
-    let questions = service.list_security_questions(query.only_active.unwrap_or(false))?;
-    Ok(web::Json(questions))
+) -> Result<HttpResponse, ApiError> {
+    let page = query.page.unwrap_or(1);
+    let page_size = query.page_size.unwrap_or(10);
+    let only_active = query.only_active.unwrap_or(false);
+    
+    let (questions, total) = SecurityQuestionService::list_questions(
+        &pool, page, page_size, only_active,
+    )?;
+    
+    Ok(HttpResponse::Ok().json(ListResponse {
+        data: questions,
+        page,
+        page_size,
+        total,
+    }))
 }
 
-#[derive(Debug, Deserialize)]
+#[put("/admin/questions/{id}")]
+#[has_permissions("ADMIN")]
+pub async fn update_question(
+    pool: web::Data<DbPool>,
+    _auth: BearerAuth,
+    path: web::Path<String>,
+    dto: web::Json<UpdateSecurityQuestionDto>,
+) -> Result<HttpResponse, ApiError> {
+    // Validar DTO
+    dto.validate()?;
+    
+    let id = path.into_inner();
+    let question = SecurityQuestionService::update_question(&pool, &id, dto.into_inner())?;
+    
+    Ok(HttpResponse::Ok().json(question))
+}
+
+#[delete("/admin/questions/{id}")]
+#[has_permissions("ADMIN")]
+pub async fn delete_question(
+    pool: web::Data<DbPool>,
+    _auth: BearerAuth,
+    path: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    let id = path.into_inner();
+    SecurityQuestionService::delete_question(&pool, &id)?;
+    
+    Ok(HttpResponse::NoContent().finish())
+}
+
+// === Rotas para usuários (perguntas e respostas) ===
+
+#[get("/questions")]
+pub async fn list_active_questions(
+    pool: web::Data<DbPool>,
+    auth: BearerAuth,
+    query: web::Query<ListQuestionsQuery>,
+) -> Result<HttpResponse, ApiError> {
+    // Verificar token JWT
+    let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET deve estar definido");
+    let _claims = JwtUtils::verify(&jwt_secret, &auth.token())?;
+    
+    let page = query.page.unwrap_or(1);
+    let page_size = query.page_size.unwrap_or(10);
+    
+    // Apenas perguntas ativas para usuários comuns
+    let (questions, total) = SecurityQuestionService::list_questions(
+        &pool, page, page_size, true,
+    )?;
+    
+    Ok(HttpResponse::Ok().json(ListResponse {
+        data: questions,
+        page,
+        page_size,
+        total,
+    }))
+}
+
+#[post("/users/me/security-answers")]
+pub async fn add_security_answer(
+    pool: web::Data<DbPool>,
+    auth: BearerAuth,
+    dto: web::Json<CreateUserSecurityAnswerDto>,
+) -> Result<HttpResponse, ApiError> {
+    // Verificar token JWT
+    let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET deve estar definido");
+    let claims = JwtUtils::verify(&jwt_secret, &auth.token())?;
+    
+    // Validar DTO
+    dto.validate()?;
+    
+    // Obter salt rounds para bcrypt
+    let salt_rounds = env::var("BCRYPT_SALT_ROUNDS")
+        .unwrap_or_else(|_| "10".to_string())
+        .parse::<u32>()
+        .unwrap_or(10);
+        
+    // Processar a requisição
+    let answer = SecurityQuestionService::add_user_answer(
+        &pool, &claims.sub, dto.into_inner(), salt_rounds,
+    )?;
+    
+    Ok(HttpResponse::Created().json(answer))
+}
+
+#[get("/users/me/security-answers")]
+pub async fn list_user_answers(
+    pool: web::Data<DbPool>,
+    auth: BearerAuth,
+) -> Result<HttpResponse, ApiError> {
+    // Verificar token JWT
+    let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET deve estar definido");
+    let claims = JwtUtils::verify(&jwt_secret, &auth.token())?;
+    
+    let answers = SecurityQuestionService::list_user_answers(&pool, &claims.sub)?;
+    
+    Ok(HttpResponse::Ok().json(answers))
+}
+
+#[put("/users/me/security-answers/{id}")]
+pub async fn update_security_answer(
+    pool: web::Data<DbPool>,
+    auth: BearerAuth,
+    path: web::Path<String>,
+    dto: web::Json<UpdateSecurityAnswerDto>,
+) -> Result<HttpResponse, ApiError> {
+    // Verificar token JWT
+    let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET deve estar definido");
+    let claims = JwtUtils::verify(&jwt_secret, &auth.token())?;
+    
+    // Validar DTO
+    dto.validate()?;
+    
+    // Obter salt rounds para bcrypt
+    let salt_rounds = env::var("BCRYPT_SALT_ROUNDS")
+        .unwrap_or_else(|_| "10".to_string())
+        .parse::<u32>()
+        .unwrap_or(10);
+    
+    let id = path.into_inner();
+    let answer = SecurityQuestionService::update_user_answer(
+        &pool, &claims.sub, &id, &dto.answer, salt_rounds,
+    )?;
+    
+    Ok(HttpResponse::Ok().json(answer))
+}
+
+#[delete("/users/me/security-answers/{id}")]
+pub async fn delete_security_answer(
+    pool: web::Data<DbPool>,
+    auth: BearerAuth,
+    path: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    // Verificar token JWT
+    let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET deve estar definido");
+    let claims = JwtUtils::verify(&jwt_secret, &auth.token())?;
+    
+    let id = path.into_inner();
+    SecurityQuestionService::delete_user_answer(&pool, &claims.sub, &id)?;
+    
+    Ok(HttpResponse::NoContent().finish())
+}
+
+// === DTOs auxiliares ===
+
+#[derive(serde::Deserialize)]
 pub struct ListQuestionsQuery {
+    pub page: Option<u64>,
+    pub page_size: Option<u64>,
     pub only_active: Option<bool>,
 }
 
-#[get("/security-questions/{question_id}")]
-pub async fn get_security_question_handler(
-    service: web::Data<SecurityQuestionService>,
-    path: web::Path<String>
-) -> ActixResult<impl Responder> {
-    let question_id = path.into_inner();
-    let question_uuid = Uuid::parse_str(&question_id)
-        .map_err(|_| ApiError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
-    
-    let question = service.get_security_question_by_id(&question_uuid)?;
-    Ok(web::Json(question))
+#[derive(serde::Serialize)]
+pub struct ListResponse<T> {
+    pub data: T,
+    pub page: u64,
+    pub page_size: u64,
+    pub total: u64,
 }
 
-#[put("/security-questions/{question_id}")]
-pub async fn update_security_question_handler(
-    service: web::Data<SecurityQuestionService>,
-    path: web::Path<String>,
-    dto: web::Json<UpdateSecurityQuestionDto>
-) -> ActixResult<impl Responder> {
-    let question_id = path.into_inner();
-    let question_uuid = Uuid::parse_str(&question_id)
-        .map_err(|_| ApiError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
-    
-    let updated_question = service.update_security_question(
-        &question_uuid, 
-        dto.text.clone(), 
-        dto.active
-    )?;
-    
-    Ok(web::Json(updated_question))
+#[derive(serde::Deserialize, Validate)]
+pub struct UpdateSecurityAnswerDto {
+    #[validate(length(min = 2, max = 100, message = "A resposta deve ter entre 2 e 100 caracteres"))]
+    pub answer: String,
 }
 
-#[delete("/security-questions/{question_id}")]
-pub async fn delete_security_question_handler(
-    service: web::Data<SecurityQuestionService>,
-    path: web::Path<String>
-) -> ActixResult<impl Responder> {
-    let question_id = path.into_inner();
-    let question_uuid = Uuid::parse_str(&question_id)
-        .map_err(|_| ApiError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
-    
-    service.delete_security_question(&question_uuid)?;
-    Ok(HttpResponse::Ok().json(serde_json::json!({ "message": "Pergunta de segurança excluída com sucesso ✅" })))
-}
+// === Configuração de rotas ===
 
-#[put("/security-questions/{question_id}/deactivate")]
-pub async fn deactivate_security_question_handler(
-    service: web::Data<SecurityQuestionService>,
-    path: web::Path<String>
-) -> ActixResult<impl Responder> {
-    let question_id = path.into_inner();
-    let question_uuid = Uuid::parse_str(&question_id)
-        .map_err(|_| ApiError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
-    
-    let updated_question = service.deactivate_security_question(&question_uuid)?;
-    Ok(web::Json(updated_question))
-}
-
-// ----- Handlers para Respostas de Usuários -----
-
-#[post("/users/{user_id}/security-questions/{question_id}/answers")]
-pub async fn set_user_answer_handler(
-    service: web::Data<SecurityQuestionService>,
-    path: web::Path<(String, String)>,
-    dto: web::Json<SetUserAnswerDto>
-) -> ActixResult<impl Responder> {
-    let (user_id, question_id) = path.into_inner();
-    
-    let user_uuid = Uuid::parse_str(&user_id)
-        .map_err(|_| ApiError::BadRequest("ID do usuário inválido 🚫".to_string()))?;
-    
-    let question_uuid = Uuid::parse_str(&question_id)
-        .map_err(|_| ApiError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
-    
-    service.set_user_security_answer(&user_uuid, &question_uuid, &dto.answer)?;
-    
-    Ok(HttpResponse::Ok().json(serde_json::json!({ "message": "Resposta de segurança configurada com sucesso ✅" })))
-}
-
-#[get("/users/{user_id}/security-questions/answers")]
-pub async fn get_user_answers_handler(
-    service: web::Data<SecurityQuestionService>,
-    path: web::Path<String>
-) -> ActixResult<impl Responder> {
-    let user_id = path.into_inner();
-    let user_uuid = Uuid::parse_str(&user_id)
-        .map_err(|_| ApiError::BadRequest("ID do usuário inválido 🚫".to_string()))?;
-    
-    let answers = service.get_user_security_answers(&user_uuid)?;
-    Ok(web::Json(answers))
-}
-
-#[post("/users/{user_id}/security-questions/{question_id}/verify")]
-pub async fn verify_user_answer_handler(
-    service: web::Data<SecurityQuestionService>,
-    path: web::Path<(String, String)>,
-    dto: web::Json<VerifyAnswerDto>
-) -> ActixResult<impl Responder> {
-    let (user_id, question_id) = path.into_inner();
-    
-    let user_uuid = Uuid::parse_str(&user_id)
-        .map_err(|_| ApiError::BadRequest("ID do usuário inválido 🚫".to_string()))?;
-    
-    let question_uuid = Uuid::parse_str(&question_id)
-        .map_err(|_| ApiError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
-    
-    let is_valid = service.verify_security_answer(&user_uuid, &question_uuid, &dto.answer)?;
-    
-    Ok(HttpResponse::Ok().json(serde_json::json!({ "is_valid": is_valid })))
-}
-
-#[delete("/users/{user_id}/security-questions/{question_id}/answers")]
-pub async fn delete_user_answer_handler(
-    service: web::Data<SecurityQuestionService>,
-    path: web::Path<(String, String)>
-) -> ActixResult<impl Responder> {
-    let (user_id, question_id) = path.into_inner();
-    
-    let user_uuid = Uuid::parse_str(&user_id)
-        .map_err(|_| ApiError::BadRequest("ID do usuário inválido 🚫".to_string()))?;
-    
-    let question_uuid = Uuid::parse_str(&question_id)
-        .map_err(|_| ApiError::BadRequest("ID da pergunta inválido 🚫".to_string()))?;
-    
-    service.delete_user_security_answer(&user_uuid, &question_uuid)?;
-    
-    Ok(HttpResponse::Ok().json(serde_json::json!({ "message": "Resposta de segurança removida com sucesso ✅" })))
-}
-
-#[delete("/users/{user_id}/security-questions/answers")]
-pub async fn delete_all_user_answers_handler(
-    service: web::Data<SecurityQuestionService>,
-    path: web::Path<String>
-) -> ActixResult<impl Responder> {
-    let user_id = path.into_inner();
-    let user_uuid = Uuid::parse_str(&user_id)
-        .map_err(|_| ApiError::BadRequest("ID do usuário inválido 🚫".to_string()))?;
-    
-    service.delete_all_user_security_answers(&user_uuid)?;
-    
-    Ok(HttpResponse::Ok().json(serde_json::json!({ "message": "Todas as respostas de segurança removidas com sucesso ✅" })))
-}
-
-// Função para configurar as rotas de perguntas de segurança
-pub fn configure_security_question_routes(cfg: &mut web::ServiceConfig) {
-    // Rotas para administradores (gerenciar perguntas de segurança)
+pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::scope("/admin")
-            .wrap(PermissionAuth::new("security_questions:manage"))
-            .service(create_security_question_handler)
-            .service(update_security_question_handler)
-            .service(delete_security_question_handler)
-            .service(deactivate_security_question_handler)
+        web::scope("/api/security-questions")
+            .service(create_question)
+            .service(get_question)
+            .service(list_questions)
+            .service(update_question)
+            .service(delete_question)
+            .service(list_active_questions)
+            .service(add_security_answer)
+            .service(list_user_answers)
+            .service(update_security_answer)
+            .service(delete_security_answer)
     );
-    
-    // Rotas públicas (listar perguntas ativas)
-    cfg.service(list_security_questions_handler);
-    cfg.service(get_security_question_handler);
-    
-    // Rotas para usuários autenticados (gerenciar suas próprias respostas)
-    cfg.service(set_user_answer_handler);
-    cfg.service(get_user_answers_handler);
-    cfg.service(verify_user_answer_handler);
-    cfg.service(delete_user_answer_handler);
-    cfg.service(delete_all_user_answers_handler);
 } 

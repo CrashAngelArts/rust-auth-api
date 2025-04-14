@@ -12,6 +12,7 @@ actix-cors = "0.6.4"
 actix-rt = "2.9.0"
 actix-session = { version = "0.7.2", features = ["cookie-session"] }
 actix-files = "0.6.2" # Para servir arquivos estáticos
+actix-web-grants = "3.0.1" # Para controle de acesso baseado em roles/permissões
 futures = "0.3.28"
 futures-util = "0.3"
 

@@ -30,9 +30,7 @@ rust-auth-api/
 │   │   ├── keystroke_controller.rs
 │   │   ├── mod.rs
 │   │   ├── oauth_controller.rs
-│   │   ├── rbac_controller.rs
 │   │   ├── recovery_email_controller.rs
-│   │   ├── security_question_controller.rs
 │   │   ├── token_controller.rs
 │   │   ├── two_factor_controller.rs
 │   │   └── user_controller.rs
@@ -60,11 +58,8 @@ rust-auth-api/
 │   │   ├── keystroke_dynamics.rs
 │   │   ├── mod.rs
 │   │   ├── oauth.rs
-│   │   ├── permission.rs
 │   │   ├── recovery_email.rs
 │   │   ├── response.rs
-│   │   ├── role.rs
-│   │   ├── security_question.rs
 │   │   ├── token.rs
 │   │   ├── two_factor.rs
 │   │   └── user.rs

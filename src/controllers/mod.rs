@@ -9,4 +9,4 @@ pub mod device_controller;
 pub mod recovery_email_controller;
 pub mod oauth_controller;
 pub mod rbac_controller;
-pub mod security_question_controller;
+pub mod security_question_controller; 

@@ -47,7 +47,6 @@ pub struct EmailConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct SecurityConfig {
     pub password_salt_rounds: u32,
-    pub use_argon2: Option<bool>,
     pub rate_limit_capacity: u32,
     pub rate_limit_refill_rate: f64,
     pub max_login_attempts: u32,
@@ -55,13 +54,12 @@ pub struct SecurityConfig {
     pub unlock_token_duration_minutes: u64,
     
     pub keystroke_threshold: Option<u8>,
-    pub keystroke_rate_limit_requests: Option<u32>,
+    pub keystroke_rate_limit_requests: Option<usize>,
     pub keystroke_rate_limit_duration: Option<u64>,
     pub keystroke_block_duration: Option<u64>,
     
     pub email_verification_enabled: bool,
     pub csrf_secret: String,
-    pub session_max_active: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -164,7 +162,6 @@ impl Config {
                 .unwrap_or_else(|_| "10".to_string())
                 .parse()
                 .unwrap_or(10),
-            use_argon2: env::var("USE_ARGON2").ok().and_then(|v| v.parse().ok()),
             rate_limit_capacity: env::var("RATE_LIMIT_CAPACITY")
                 .unwrap_or_else(|_| "100".to_string())
                 .parse::<u32>()
@@ -212,9 +209,6 @@ impl Config {
                 .parse()
                 .unwrap_or(true),
             csrf_secret: env::var("CSRF_SECRET")?,
-            session_max_active: env::var("SESSION_MAX_ACTIVE")
-                .ok()
-                .and_then(|v| v.parse().ok()),
         };
 
         let cors = CorsConfig {

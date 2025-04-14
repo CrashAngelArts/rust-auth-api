@@ -60,6 +60,9 @@ pub enum ApiError {
 
     #[error("Atividade de login suspeita: {0}")]
     SuspiciousLoginActivity(String),
+    
+    #[error("Acesso proibido: {0}")]
+    ForbiddenError(String),
 }
 
 // Conversão de erro de bloqueio do Actix
@@ -146,6 +149,7 @@ impl ResponseError for ApiError {
             ApiError::Forbidden(_) => StatusCode::FORBIDDEN,              // 403
             ApiError::TooManyRequests(_) => StatusCode::TOO_MANY_REQUESTS, // 429
             ApiError::RateLimited(_) => StatusCode::TOO_MANY_REQUESTS,    // 429
+            ApiError::ForbiddenError(_) => StatusCode::FORBIDDEN,         // 403
             _ => StatusCode::INTERNAL_SERVER_ERROR, // 500 para outros erros
         }
     }
