@@ -12,6 +12,7 @@ use crate::controllers::{
     oauth_controller, // Novo controlador de autenticação OAuth 🔑
     rbac_controller, // <-- Adicionar import para rbac_controller
     security_question_controller, // <-- Adicionar import para security_question_controller
+    webhook_controller, // <-- Novo controlador de webhooks 🚨
 };
 use crate::middleware::{
     auth::{AdminAuth, JwtAuth},
@@ -61,6 +62,10 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
     // Configura as rotas
     cfg.service(
         web::scope("/api")
+            // --- Webhooks ---
+            .service(webhook_controller::list_webhooks)
+            .service(webhook_controller::register_webhook)
+            .service(webhook_controller::remove_webhook)
             .wrap(cors)
             .wrap(error_handler)
             .wrap(request_logger)

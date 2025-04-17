@@ -98,11 +98,12 @@ Este documento lista as funcionalidades já implementadas (✅) e as tarefas pen
 
 ### 6. Webhooks para Eventos de Segurança (Prioridade Baixa)
 
+- [x] Estrutura básica de webhooks criada (model, serviço e endpoints stubs)
+
 - [ ] **Sistema de Webhooks**
   - [ ] Criar modelo para armazenar inscrições de webhooks
   - [ ] Implementar endpoints para gerenciar inscrições
   - [ ] Implementar lógica para disparar webhooks em eventos específicos
-  - [ ] Adicionar fila de trabalho assíncrono para envio de webhooks
 
 ## 📝 Notas Adicionais
 
