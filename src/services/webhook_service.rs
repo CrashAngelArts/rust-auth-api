@@ -53,11 +53,33 @@ impl WebhookService {
         save_webhooks_to_file(&hooks);
         log::info!("Webhook removido e persistência atualizada! 🚨🗑️");
     }
-    pub fn trigger_event(event_type: &str, payload: &str) {
-        let hooks = WEBHOOKS.lock().unwrap();
-        for hook in hooks.iter().filter(|h| h.enabled && h.event_type == event_type) {
-            // Aqui só loga, integração real virá depois
-            log::info!("🚨 Disparando webhook para {}: {}", hook.url, payload);
+    pub async fn trigger_event(event_type: &str, payload: &str) {
+        let hooks = WEBHOOKS.lock().unwrap().clone();
+        let client = reqwest::Client::new();
+        for hook in hooks.into_iter().filter(|h| h.enabled && h.event_type == event_type) {
+            let url = hook.url.clone();
+            let payload = payload.to_string();
+            let client = client.clone();
+            // Disparo assíncrono
+            actix_web::rt::spawn(async move {
+                let res = client
+                    .post(&url)
+                    .header("Content-Type", "application/json")
+                    .body(payload.clone())
+                    .send()
+                    .await;
+                match res {
+                    Ok(resp) if resp.status().is_success() => {
+                        log::info!("🚀 Webhook enviado com sucesso para {}!", url);
+                    }
+                    Ok(resp) => {
+                        log::warn!("⚠️ Webhook para {} respondeu com status {}", url, resp.status());
+                    }
+                    Err(e) => {
+                        log::error!("❌ Falha ao enviar webhook para {}: {}", url, e);
+                    }
+                }
+            });
         }
     }
     pub fn list_webhooks() -> Vec<WebhookConfig> {
