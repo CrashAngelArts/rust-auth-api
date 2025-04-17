@@ -252,6 +252,18 @@ impl AuthService {
         };
 
         info!("✅ Login bem-sucedido para o usuário: {}", user.username);
+        // Disparar webhook de login_success (assíncrono, não bloqueante)
+        let payload = serde_json::json!({
+            "user_id": user.id,
+            "username": user.username,
+            "ip_address": ip_address,
+            "user_agent": user_agent,
+            "timestamp": chrono::Utc::now().to_rfc3339(),
+        });
+        let payload = payload.to_string();
+        actix_web::rt::spawn(async move {
+            crate::services::webhook_service::WebhookService::trigger_event("login_success", &payload).await;
+        });
         Ok(auth_response)
     }
 
