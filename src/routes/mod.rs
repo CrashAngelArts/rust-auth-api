@@ -13,6 +13,7 @@ use crate::controllers::{
     rbac_controller, // <-- Adicionar import para rbac_controller
     security_question_controller, // <-- Adicionar import para security_question_controller
     webhook_controller, // <-- Novo controlador de webhooks 🚨
+    webauthn_controller, // <-- Novo controlador de WebAuthn 🔐
 };
 use crate::middleware::{
     auth::{AdminAuth, JwtAuth},
@@ -66,6 +67,9 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
             .service(webhook_controller::list_webhooks)
             .service(webhook_controller::register_webhook)
             .service(webhook_controller::remove_webhook)
+            // --- WebAuthn ---
+            .service(webauthn_controller::register_webauthn)
+            .service(webauthn_controller::list_webauthn)
             .wrap(cors)
             .wrap(error_handler)
             .wrap(request_logger)

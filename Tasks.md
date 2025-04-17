@@ -90,6 +90,7 @@ Este documento lista as funcionalidades já implementadas (✅) e as tarefas pen
 
 ### 5. WebAuthn/Passkeys (Prioridade Baixa)
 
+- [x] Estrutura inicial criada (modelo, serviço e endpoints stubs) 🔐
 - [ ] **Suporte para WebAuthn/FIDO2**
   - [ ] Adicionar modelos para armazenar credenciais WebAuthn
   - [ ] Implementar endpoints para registro de credenciais

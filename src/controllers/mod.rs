@@ -11,4 +11,6 @@ pub mod oauth_controller;
 pub mod rbac_controller;
 pub mod security_question_controller;
 pub mod webhook_controller;
+pub mod webauthn_controller;
+
 

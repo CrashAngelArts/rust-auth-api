@@ -12,4 +12,6 @@ pub mod role;
 pub mod permission;
 pub mod security_question;
 pub mod webhook;
+pub mod webauthn;
+
 

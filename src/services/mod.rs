@@ -11,6 +11,8 @@ pub mod recovery_email_service;
 pub mod oauth_service;
 pub mod rbac_service;
 pub mod webhook_service;
+pub mod webauthn_service;
+
 
 // Re-exportar structs/enums para facilitar imports externos
 // Estes exports são utilizados principalmente no main.rs e em outros módulos
