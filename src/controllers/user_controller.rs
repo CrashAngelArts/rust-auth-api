@@ -166,7 +166,7 @@ pub async fn delete_user(
     )))
 }
 
-// ✨ Define a senha temporária para o usuário autenticado
+// ✨ Define uma senha temporária para o usuário autenticado
 pub async fn set_temporary_password_handler(
     pool: web::Data<DbPool>, 
     dto: web::Json<CreateTemporaryPasswordDto>,
@@ -176,6 +176,14 @@ pub async fn set_temporary_password_handler(
     // Extrair ID do usuário autenticado a partir do token JWT
     let user_id = claims.sub.clone();
     
+    // Verificar se o usuário existe (opcional, mas recomendado)
+    let user = UserService::get_user_by_id(&pool, &user_id)?;
+    
+    // Verificar se a conta está ativa 
+    if !user.is_active {
+        return Err(ApiError::BadRequestError("Não é possível criar senha temporária para conta inativa ❌".to_string()));
+    }
+    
     // Chamar o serviço para criar a senha temporária
     let temp_password_response = UserService::set_temporary_password(
         pool.into_inner(),
@@ -184,10 +192,13 @@ pub async fn set_temporary_password_handler(
         &config,
     ).await?;
     
+    // Salvar o limite de uso antes de mover o temp_password_response
+    let usage_limit = temp_password_response.usage_limit;
+    
     // Retornar resposta de sucesso com detalhes da senha temporária
     Ok(HttpResponse::Created().json(ApiResponse::success_with_message(
         temp_password_response,
-        "Senha temporária criada com sucesso! 🎉"
+        &format!("Senha temporária criada com sucesso! 🎉🔑 (Limite de uso: {} vezes)", usage_limit)
     )))
 }
 
