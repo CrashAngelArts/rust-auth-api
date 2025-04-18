@@ -1,0 +1,172 @@
+[
+  {
+    "id": 1,
+    "title": "Código Único de Recuperação",
+    "description": "Implementar sistema de códigos de recuperação únicos para usuários.",
+    "priority": "alta",
+    "category": "Segurança",
+    "code_example": "// Adicionar campos na tabela de usuários\nCREATE TABLE IF NOT EXISTS recovery_codes (\n  id INTEGER PRIMARY KEY,\n  user_id INTEGER NOT NULL,\n  code TEXT NOT NULL,\n  created_at TEXT NOT NULL,\n  expires_at TEXT NOT NULL,\n  used INTEGER DEFAULT 0\n);",
+    "status": "pendente",
+    "checkout_date": null,
+    "completed_date": null,
+    "estimated_hours": null,
+    "tags": [
+      "recuperação",
+      "segurança",
+      "usuários"
+    ]
+  },
+  {
+    "id": 2,
+    "title": "Detecção de Localização Suspeita",
+    "description": "Implementar análise de risco baseada em localização geográfica do login.",
+    "priority": "alta",
+    "category": "Segurança",
+    "code_example": "pub struct LocationRiskAnalyzer {\n    pub geo_database: GeoIpDatabase,\n    pub velocity_threshold_km_h: f64,\n    pub risk_threshold_distance_km: u32,\n}",
+    "status": "pendente",
+    "checkout_date": null,
+    "completed_date": null,
+    "estimated_hours": null,
+    "tags": [
+      "análise de risco",
+      "geolocalização",
+      "segurança"
+    ]
+  },
+  {
+    "id": 3,
+    "title": "Análise de Horário de Login",
+    "description": "Implementar detecção de atividades suspeitas baseadas em padrões temporais.",
+    "priority": "alta",
+    "category": "Segurança",
+    "code_example": "pub struct TimePatternAnalyzer {\n    pub unusual_hour_threshold: f64,\n    pub timezone_mismatch_weight: f64,\n}",
+    "status": "pendente",
+    "checkout_date": null,
+    "completed_date": null,
+    "estimated_hours": null,
+    "tags": [
+      "análise de risco",
+      "padrão temporal",
+      "segurança"
+    ]
+  },
+  {
+    "id": 4,
+    "title": "Revogação de Sessão Individual",
+    "description": "Permitir a revogação de sessões específicas do usuário.",
+    "priority": "média",
+    "category": "Gerenciamento de Sessões",
+    "code_example": "pub async fn revoke_specific_session(\n    pool: &DbPool,\n    user_id: &str,\n    session_id: &str,\n) -> Result<bool, ApiError> {\n    // Implementação\n}",
+    "status": "pendente",
+    "checkout_date": null,
+    "completed_date": null,
+    "estimated_hours": null,
+    "tags": [
+      "sessões",
+      "revogação",
+      "segurança"
+    ]
+  },
+  {
+    "id": 5,
+    "title": "Limite de Sessões Ativas",
+    "description": "Implementar política de limitação de número de sessões simultâneas por usuário.",
+    "priority": "média",
+    "category": "Gerenciamento de Sessões",
+    "code_example": "pub struct SessionLimitPolicy {\n    pub max_sessions_per_user: u32,\n    pub revoke_strategy: RevocationStrategy,\n}",
+    "status": "pendente",
+    "checkout_date": null,
+    "completed_date": null,
+    "estimated_hours": null,
+    "tags": [
+      "sessões",
+      "limite",
+      "segurança"
+    ]
+  },
+  {
+    "id": 6,
+    "title": "Logs de Ações Críticas",
+    "description": "Implementar registro detalhado de ações sensíveis no sistema.",
+    "priority": "média",
+    "category": "Auditoria",
+    "code_example": "pub struct AuditLogEntry {\n    pub id: String,\n    pub user_id: Option<String>,\n    pub admin_id: Option<String>,\n    pub action: AuditAction,\n    // ...\n}",
+    "status": "pendente",
+    "checkout_date": null,
+    "completed_date": null,
+    "estimated_hours": null,
+    "tags": [
+      "logs",
+      "auditoria",
+      "segurança"
+    ]
+  },
+  {
+    "id": 7,
+    "title": "WebAuthn/Passkeys",
+    "description": "Implementar autenticação sem senha usando WebAuthn/FIDO2.",
+    "priority": "baixa",
+    "category": "Autenticação",
+    "code_example": "pub struct WebAuthnCredential {\n    pub id: String,\n    pub user_id: String,\n    pub public_key: String,\n    // ...\n}",
+    "status": "pendente",
+    "checkout_date": null,
+    "completed_date": null,
+    "estimated_hours": null,
+    "tags": [
+      "webauthn",
+      "passwordless",
+      "fido2"
+    ]
+  },
+  {
+    "id": 8,
+    "title": "Sistema de Webhooks",
+    "description": "Implementar sistema de notificações via webhooks para eventos do sistema.",
+    "priority": "baixa",
+    "category": "Integração",
+    "code_example": "pub struct WebhookSubscription {\n    pub id: String,\n    pub client_id: String,\n    pub event_types: Vec<String>,\n    // ...\n}",
+    "status": "pendente",
+    "checkout_date": null,
+    "completed_date": null,
+    "estimated_hours": null,
+    "tags": [
+      "webhooks",
+      "notificações",
+      "integração"
+    ]
+  },
+  {
+    "id": 9,
+    "title": "Rotação de JWT Key",
+    "description": "Implementar suporte para rotação de chaves JWT.",
+    "priority": "média",
+    "category": "Segurança",
+    "code_example": "struct JwtKeyManager {\n    current_key: String,\n    previous_keys: Vec<String>,\n    rotation_timestamp: DateTime<Utc>,\n}",
+    "status": "pendente",
+    "checkout_date": null,
+    "completed_date": null,
+    "estimated_hours": null,
+    "tags": [
+      "jwt",
+      "rotação de chaves",
+      "segurança"
+    ]
+  },
+  {
+    "id": 10,
+    "title": "Verificação de Integridade do Banco",
+    "description": "Implementar verificação periódica de integridade do banco de dados.",
+    "priority": "média",
+    "category": "Banco de Dados",
+    "code_example": "fn validate_db_integrity(conn: &Connection) -> Result<(), ApiError> {\n    let integrity_check: String = conn.query_row(\"PRAGMA integrity_check\", [], |row| row.get(0))?;\n    if integrity_check != \"ok\" {\n        return Err(ApiError::DatabaseError(format!(\"Falha na verificação de integridade: {}\", integrity_check)));\n    }\n    Ok()\n}",
+    "status": "pendente",
+    "checkout_date": null,
+    "completed_date": null,
+    "estimated_hours": null,
+    "tags": [
+      "banco de dados",
+      "integridade",
+      "manutenção"
+    ]
+  }
+]
