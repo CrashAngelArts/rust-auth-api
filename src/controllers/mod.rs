@@ -13,5 +13,6 @@ pub mod security_question_controller;
 pub mod webhook_controller;
 pub mod webauthn_controller;
 pub mod recovery_code_controller;
+pub mod location_controller;
 
 

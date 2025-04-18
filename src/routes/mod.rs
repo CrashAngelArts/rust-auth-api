@@ -15,6 +15,7 @@ use crate::controllers::{
     webhook_controller, // <-- Novo controlador de webhooks 🚨
     webauthn_controller, // <-- Novo controlador de WebAuthn 🔐
     recovery_code_controller, // <-- Novo controlador de códigos de recuperação 🔑
+    location_controller, // <-- Novo controlador de localizações de login 🌎
 };
 use crate::middleware::{
     auth::{AdminAuth, JwtAuth},
@@ -27,10 +28,9 @@ use crate::middleware::{
     csrf::CsrfProtect, // <-- Adicionado middleware CSRF 🛡️🍪
 };
 use crate::services::keystroke_security_service::KeystrokeSecurityService;
-use actix_web::{web, HttpResponse, Responder, post, get};
+use actix_web::{web, HttpResponse};
 use tracing::info;
 use std::time::Duration;
-use crate::errors::ApiError;
 
 // Configura as rotas da API
 pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
@@ -216,6 +216,12 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
                 web::scope("/recovery-codes")
                     .wrap(jwt_auth.clone())
                     .configure(recovery_code_controller::config) // Usar a função config para configurar as rotas
+            )
+            // Rotas para localizações de login 🌎
+            .service(
+                web::scope("/locations")
+                    .wrap(jwt_auth.clone())
+                    .configure(location_controller::config) // Usar a função config para configurar as rotas
             ),
     )
     .service(

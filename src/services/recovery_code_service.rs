@@ -6,8 +6,7 @@ use rand::{thread_rng, Rng};
 use rand::distributions::Alphanumeric;
 use rusqlite::params;
 use tracing::{error, info, warn};
-use uuid::Uuid;
-use std::sync::Arc;
+use rusqlite::Connection;
 
 /// Serviço para gerenciar códigos de recuperação únicos
 pub struct RecoveryCodeService;

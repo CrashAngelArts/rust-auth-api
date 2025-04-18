@@ -76,5 +76,10 @@ woothee = "0.13.0" # Parser de User-Agent para detecção de dispositivos
 moka = { version = "0.12", features = ["future"] } # Cache em memória assíncrono ⚡️
 lazy_static = "1.4"
 
+# Geolocalização
+maxminddb = "0.26.0" # Biblioteca de consulta ao MaxMind GeoIP2
+geo = "0.26.0"      # Biblioteca para cálculo de distâncias geográficas
+haversine = "0.2.1" # Para cálculo de distâncias entre coordenadas geográficas
+
 [dev-dependencies]
 actix-rt = "2.9.0"

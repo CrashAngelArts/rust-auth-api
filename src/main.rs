@@ -14,7 +14,7 @@ use actix_web::{App, HttpServer, web};
 use actix_web::cookie::Key;
 use actix_files::Files; // Adicionado para servir arquivos estáticos
 use dotenv::dotenv;
-use tracing::{info, error};
+use tracing::{info, error, warn};
 use tracing_actix_web::TracingLogger;
 use middleware::security::configure_security;
 use moka::future::Cache;
@@ -90,6 +90,13 @@ async fn main() -> std::io::Result<()> {
         .time_to_idle(Duration::from_secs(3600 * 24))
         .build();
     info!("✅ Cache de validação de token (Moka) inicializado com sucesso");
+
+    // Inicializa o banco de dados GeoIP para análise de localizações
+    let geoip_path = "data/GeoLite2-City.mmdb";
+    match services::location_risk_service::LocationRiskAnalyzer::init_geoip_db(geoip_path) {
+        Ok(_) => info!("✅ Banco de dados GeoIP inicializado com sucesso: {}", geoip_path),
+        Err(e) => warn!("⚠️ Não foi possível inicializar o banco de dados GeoIP: {}. Análise de risco de localização não estará disponível.", e),
+    }
 
     // Inicializa o serviço RBAC
     let rbac_service = RbacService::new(pool.clone());

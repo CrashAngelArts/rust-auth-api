@@ -23,7 +23,8 @@ use std::sync::Arc;
 use crate::repositories::temporary_password_repository;
 use crate::utils::password_argon2;
 use crate::models::temporary_password::TemporaryPassword;
-// use rusqlite::OptionalExtension; // Removido - não usado aqui
+use crate::services::location_risk_service::LocationRiskAnalyzer;
+use tokio;
 
 pub struct AuthService;
 
@@ -153,6 +154,30 @@ impl AuthService {
                         &user_agent,
                         24,
                     )?; // Chamada síncrona
+
+                    // Analisar localização se o IP estiver disponível
+                    if let Some(ip) = ip_address.clone() {
+                        // Analisar a localização do IP em uma thread separada para não bloquear o login
+                        let user_id_clone = user.id.clone();
+                        let pool_clone = pool_arc.clone();
+                        
+                        tokio::spawn(async move {
+                            let analyzer = LocationRiskAnalyzer::default();
+                            match analyzer.analyze(&pool_clone, &user_id_clone, &ip) {
+                                Ok(location) => {
+                                    if location.is_suspicious {
+                                        warn!("⚠️ Login com senha temporária em localização suspeita para o usuário {}! Motivo: {}", 
+                                            user_id_clone, 
+                                            location.suspicious_reason.as_deref().unwrap_or("desconhecido")
+                                        );
+                                    } else {
+                                        info!("✅ Localização de login registrada para o usuário {}", user_id_clone);
+                                    }
+                                },
+                                Err(e) => error!("❌ Erro ao analisar localização de login: {}", e),
+                            }
+                        });
+                    }
 
                     // Logar evento de login com senha temporária
                      Self::log_auth_event(

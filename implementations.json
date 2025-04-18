@@ -6,9 +6,9 @@
     "priority": "alta",
     "category": "Segurança",
     "code_example": "// Adicionar campos na tabela de usuários\nCREATE TABLE IF NOT EXISTS recovery_codes (\n  id INTEGER PRIMARY KEY,\n  user_id INTEGER NOT NULL,\n  code TEXT NOT NULL,\n  created_at TEXT NOT NULL,\n  expires_at TEXT NOT NULL,\n  used INTEGER DEFAULT 0\n);",
-    "status": "pendente",
+    "status": "concluída",
     "checkout_date": null,
-    "completed_date": null,
+    "completed_date": "2025-04-18 02:53:16",
     "estimated_hours": null,
     "tags": [
       "recuperação",
@@ -23,8 +23,8 @@
     "priority": "alta",
     "category": "Segurança",
     "code_example": "pub struct LocationRiskAnalyzer {\n    pub geo_database: GeoIpDatabase,\n    pub velocity_threshold_km_h: f64,\n    pub risk_threshold_distance_km: u32,\n}",
-    "status": "pendente",
-    "checkout_date": null,
+    "status": "em progresso",
+    "checkout_date": "2025-04-18 02:55:09",
     "completed_date": null,
     "estimated_hours": null,
     "tags": [
