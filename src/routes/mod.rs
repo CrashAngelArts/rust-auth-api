@@ -14,6 +14,7 @@ use crate::controllers::{
     security_question_controller, // <-- Adicionar import para security_question_controller
     webhook_controller, // <-- Novo controlador de webhooks 🚨
     webauthn_controller, // <-- Novo controlador de WebAuthn 🔐
+    recovery_code_controller, // <-- Novo controlador de códigos de recuperação 🔑
 };
 use crate::middleware::{
     auth::{AdminAuth, JwtAuth},
@@ -209,6 +210,12 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
                 web::scope("/security-questions")
                     .wrap(jwt_auth.clone())
                     .configure(security_question_controller::config) // Usar a função config para configurar as rotas
+            )
+            // Rotas para códigos de recuperação 🔑
+            .service(
+                web::scope("/recovery-codes")
+                    .wrap(jwt_auth.clone())
+                    .configure(recovery_code_controller::config) // Usar a função config para configurar as rotas
             ),
     )
     .service(

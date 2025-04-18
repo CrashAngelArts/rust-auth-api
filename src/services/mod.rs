@@ -12,6 +12,7 @@ pub mod oauth_service;
 pub mod rbac_service;
 pub mod webhook_service;
 pub mod webauthn_service;
+pub mod recovery_code_service;
 
 
 // Re-exportar structs/enums para facilitar imports externos
