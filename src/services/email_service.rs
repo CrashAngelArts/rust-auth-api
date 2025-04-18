@@ -295,6 +295,97 @@ impl EmailService {
         ).await // Adicionar await
     }
 
+    // ✨ Envia email de notificação de uso de senha temporária
+    pub async fn send_temporary_password_used_email(&self, user: &User, remaining_uses: i32) -> Result<(), ApiError> {
+        if !self.enabled {
+            info!("🔕 Serviço de email desabilitado. Email de uso de senha temporária não enviado para: {}", user.email);
+            return Ok(());
+        }
+
+        let subject = "🔒 Senha Temporária Utilizada";
+        let text_body = format!(
+            "Olá {},
+
+Sua senha temporária foi utilizada para login com sucesso.
+
+Usos restantes: {}
+
+Se você não reconhece esta atividade, por favor, altere sua senha principal e revise a segurança da sua conta.
+
+Atenciosamente,
+Equipe de Segurança 🛡️",
+            user.full_name(),
+            remaining_uses
+        );
+
+        let html_body = format!(
+           r#"<!DOCTYPE html><html><head><title>Senha Temporária Utilizada</title></head>
+           <body style="font-family: sans-serif; padding: 20px;">
+           <h2>🔒 Senha Temporária Utilizada</h2>
+           <p>Olá, <strong>{}</strong>!</p>
+           <p>Sua senha temporária foi utilizada para realizar login em sua conta.</p>
+           <p><strong>Usos restantes: {}</strong></p>
+           <p>Se você não reconhece esta atividade, recomendamos que <a href="{}/profile/security">altere sua senha principal</a> e revise a segurança da sua conta imediatamente.</p>
+           <p>Atenciosamente,<br/>Equipe de Segurança 🛡️</p>
+           </body></html>"#,
+           user.full_name(),
+           remaining_uses,
+           self.base_url // Link para perfil/segurança (ajustar URL conforme necessário)
+       );
+
+        self.send_email(
+            &user.email,
+            subject,
+            &text_body,
+            &html_body,
+        ).await
+    }
+
+    // ✨ Envia email de alerta sobre tentativa com senha temporária expirada
+    pub async fn send_expired_temporary_password_attempt_email(&self, user: &User, _attempted_password: &str) -> Result<(), ApiError> {
+        // NOTA: Não incluímos a senha tentada no email por segurança.
+        if !self.enabled {
+            info!("🔕 Serviço de email desabilitado. Email de alerta de senha temporária expirada não enviado para: {}", user.email);
+            return Ok(());
+        }
+
+        let subject = "🚨 Alerta de Segurança: Tentativa de Login com Senha Expirada";
+        let text_body = format!(
+            "Olá {},
+
+Detectamos uma tentativa de login na sua conta utilizando uma senha temporária que já expirou ou foi desativada.
+
+Isso pode indicar que uma senha antiga foi comprometida.
+
+Por favor, revise a segurança da sua conta e altere sua senha principal se suspeitar de qualquer atividade não autorizada.
+
+Atenciosamente,
+Equipe de Segurança 🛡️",
+            user.full_name()
+        );
+
+        let html_body = format!(
+            r#"<!DOCTYPE html><html><head><title>Alerta de Segurança</title></head>
+            <body style="font-family: sans-serif; padding: 20px; border-left: 5px solid #f44336; background-color: #fff5f5;">
+            <h2 style="color:#d32f2f;">🚨 Alerta de Segurança</h2>
+            <p>Olá, <strong>{}</strong>!</p>
+            <p>Detectamos uma tentativa de login na sua conta utilizando uma <strong>senha temporária que já expirou</strong> ou foi desativada.</p>
+            <p><strong>Isso pode indicar que uma senha antiga que você utilizou foi comprometida.</strong></p>
+            <p>Recomendamos fortemente que você <a href="{}/profile/security">revise a segurança da sua conta</a> e considere alterar sua senha principal, especialmente se você reutiliza senhas.</p>
+            <p>Se você não reconhece esta tentativa, entre em contato com o suporte imediatamente.</p>
+            <p>Atenciosamente,<br/>Equipe de Segurança 🛡️</p>
+            </body></html>"#,
+            user.full_name(),
+            self.base_url // Link para perfil/segurança
+        );
+
+        self.send_email(
+            &user.email,
+            subject,
+            &text_body,
+            &html_body,
+        ).await
+    }
 
     // Método genérico para envio de emails
     // Método genérico para envio de emails

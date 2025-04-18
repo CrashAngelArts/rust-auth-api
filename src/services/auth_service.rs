@@ -19,6 +19,10 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 use moka::future::Cache;
 use std::collections::HashMap;
+use std::sync::Arc;
+use crate::repositories::temporary_password_repository;
+use crate::utils::password_argon2;
+use crate::models::temporary_password::TemporaryPassword;
 // use rusqlite::OptionalExtension; // Removido - não usado aqui
 
 pub struct AuthService;
@@ -62,11 +66,12 @@ impl AuthService {
         user_agent: Option<String>,
         email_service: &EmailService,
     ) -> Result<AuthResponse, ApiError> {
-        let conn = pool.get()?;
+        // Usar Arc<DbPool> para chamadas async dentro
+        let pool_arc = Arc::new(pool.clone());
 
         // Obtém o usuário pelo email ou nome de usuário
         let mut user = UserService::get_user_by_email_or_username(pool, &login_dto.username_or_email)
-            .map_err(|_| ApiError::AuthenticationError("Credenciais inválidas".to_string()))?;
+            .map_err(|_| ApiError::AuthenticationError("Credenciais inválidas 🤷".to_string()))?;
 
         // 1. Verifica se a conta está bloqueada
         if user.is_locked() {
@@ -98,172 +103,297 @@ impl AuthService {
             return Err(ApiError::AuthenticationError("Conta inativa".to_string()));
         }
 
-        // 3. Verifica a senha
-        if !UserService::verify_password(&login_dto.password, &user.password_hash)? {
-            // Senha incorreta - Incrementar tentativas e potencialmente bloquear
-            user.failed_login_attempts += 1;
-            warn!(
-                "🔑 Falha de login (tentativa {}/{}): {}",
-                user.failed_login_attempts, config.security.max_login_attempts, user.username
-            );
+        // ✨ 3. TENTA VERIFICAR SENHA TEMPORÁRIA PRIMEIRO ✨
+        let active_temp_password: Option<TemporaryPassword> = temporary_password_repository::find_active_by_user_id(pool_arc.clone(), &user.id).await?;
 
-            let mut should_lock = false;
-            if user.failed_login_attempts >= config.security.max_login_attempts as i32 {
-                // Bloquear conta
-                should_lock = true;
-                let now = Utc::now();
-                let lockout_duration = Duration::seconds(config.security.lockout_duration_seconds as i64);
-                user.locked_until = Some(now + lockout_duration);
+        if let Some(temp_pass) = active_temp_password {
+            info!("🔑 Encontrada senha temporária ativa para {}", user.username);
+            match password_argon2::verify_password(&login_dto.password, &temp_pass.password_hash) {
+                Ok(true) => {
+                    info!("✅ Senha temporária válida para {}", user.username);
 
-                // Gerar token de desbloqueio
-                let token: String = thread_rng()
-                    .sample_iter(&Alphanumeric)
-                    .take(32) // Tamanho do token
-                    .map(char::from)
-                    .collect();
-                user.unlock_token = Some(token.clone());
-                let token_duration = Duration::minutes(config.security.unlock_token_duration_minutes as i64);
-                user.unlock_token_expires_at = Some(now + token_duration);
+                    // Incrementar uso e talvez desativar
+                    let updated_temp_pass = temporary_password_repository::increment_usage_and_maybe_deactivate(
+                        pool_arc.clone(),
+                        &temp_pass.id,
+                    ).await?;
 
-                warn!("🚫 Conta bloqueada por excesso de tentativas: {}", user.username);
+                    let remaining_uses = std::cmp::max(0, updated_temp_pass.usage_limit - updated_temp_pass.usage_count);
 
-                // Enviar email de desbloqueio (ignorar erro de email para não impedir o bloqueio)
-                if config.email.enabled {
-                    match email_service.send_account_unlock_email(&user, &token).await {
-                        Ok(_) => info!("📧 Email de desbloqueio enviado para: {}", user.email),
-                        Err(e) => error!("❌ Falha ao enviar email de desbloqueio para {}: {}", user.email, e),
+                    // --- LOGIN BEM SUCEDIDO COM SENHA TEMPORÁRIA ---
+                    // Resetar estado de bloqueio/tentativas da conta principal (importante!)
+                    if user.failed_login_attempts > 0 || user.locked_until.is_some() {
+                       user.failed_login_attempts = 0;
+                       user.locked_until = None;
+                       user.unlock_token = None;
+                       user.unlock_token_expires_at = None;
+                       let conn_sync = pool.get()?; // Obter conexão sync para update sync
+                       conn_sync.execute(
+                           "UPDATE users SET failed_login_attempts = 0, locked_until = NULL, unlock_token = NULL, unlock_token_expires_at = NULL, updated_at = ?1 WHERE id = ?2",
+                           (&Utc::now().timestamp(), &user.id),
+                       )?;
+                       info!("🔓 Estado de bloqueio resetado para o usuário: {}", user.username);
+                   }
+
+                    // Gerar tokens JWT
+                    let token = Self::generate_jwt(&user, &config.jwt.secret, &config.jwt.expiration)?;
+                    let original_refresh_token = Uuid::new_v4().to_string();
+                    let refresh_token_hash = Self::hash_token(&original_refresh_token);
+                    let mut refresh_token_db = RefreshToken::new(user.id.clone(), config.jwt.refresh_expiration_days);
+                    refresh_token_db.token_hash = refresh_token_hash;
+
+                    Self::revoke_all_user_refresh_tokens(pool, &user.id)?;
+                    Self::save_refresh_token(pool, &refresh_token_db)?;
+
+                    // Criar sessão com informações de dispositivo (chamada sync)
+                    let _session = DeviceService::create_session_with_device_info(
+                        pool, // Passar &DbPool original
+                        &user.id,
+                        &ip_address,
+                        &user_agent,
+                        24,
+                    )?; // Chamada síncrona
+
+                    // Logar evento de login com senha temporária
+                     Self::log_auth_event(
+                        pool, // Usar &DbPool original aqui para log sync
+                        Some(user.id.clone()),
+                        "login_success_temp_password".to_string(),
+                        ip_address.clone(),
+                        user_agent.clone(),
+                        Some(format!("Usos restantes: {}", remaining_uses)),
+                    )?;
+
+                    // Enviar email de notificação (descomentado)
+                    if config.email.enabled {
+                        let _ = email_service.send_temporary_password_used_email(&user, remaining_uses).await;
+                    } else {
+                        warn!("📧 Envio de email desabilitado. Não foi possível notificar sobre uso de senha temporária para {}", user.email);
                     }
-                } else {
-                     warn!("📧 Envio de email desabilitado. Não foi possível enviar email de desbloqueio para {}", user.email);
+
+                    // Cria a resposta
+                    let auth_response = AuthResponse {
+                        access_token: token,
+                        token_type: "Bearer".to_string(),
+                        expires_in: Self::parse_expiration(&config.jwt.expiration)? * 3600,
+                        refresh_token: original_refresh_token,
+                        requires_email_verification: false, // Senha temporária não exige verificação de email adicional
+                        user: user.clone(),
+                    };
+
+                    info!("🎉 Login bem-sucedido com senha temporária para {}", user.username);
+                    return Ok(auth_response);
+                }
+                Ok(false) => {
+                    info!("❌ Senha temporária incorreta fornecida para {}. Tentando senha principal.", user.username);
+                    // Não faz nada, continua para verificar a senha principal
+                }
+                Err(e) => {
+                    error!("🚨 Erro ao verificar hash da senha temporária para {}: {}. Tentando senha principal.", user.username, e);
+                    // Loga o erro, mas continua para a senha principal como fallback seguro
                 }
             }
+        } // Fim da verificação da senha temporária ativa
 
-            // Atualizar usuário no banco de dados (tentativas ou bloqueio)
-            conn.execute(
-                "UPDATE users SET failed_login_attempts = ?1, locked_until = ?2, unlock_token = ?3, unlock_token_expires_at = ?4, updated_at = ?5 WHERE id = ?6",
-                (
-                    &user.failed_login_attempts,
-                    &user.locked_until.map(|dt| dt.timestamp()), // Passar Option<i64>
-                    &user.unlock_token,
-                    &user.unlock_token_expires_at.map(|dt| dt.timestamp()), // Passar Option<i64>
-                    &Utc::now().timestamp(), // Passar i64
+        // 4. Verifica a senha PRINCIPAL
+        match UserService::verify_password(&login_dto.password, &user.password_hash) {
+            Ok(true) => { // Senha principal correta
+               // --- LOGIN BEM SUCEDIDO COM SENHA PRINCIPAL ---
+                // Resetar estado de bloqueio/tentativas
+                 if user.failed_login_attempts > 0 || user.locked_until.is_some() {
+                    user.failed_login_attempts = 0;
+                    user.locked_until = None;
+                    user.unlock_token = None;
+                    user.unlock_token_expires_at = None;
+                    let conn_sync = pool.get()?;
+                    conn_sync.execute(
+                        "UPDATE users SET failed_login_attempts = 0, locked_until = NULL, unlock_token = NULL, unlock_token_expires_at = NULL, updated_at = ?1 WHERE id = ?2",
+                        (&Utc::now().timestamp(), &user.id),
+                    )?;
+                    info!("🔓 Estado de bloqueio resetado para o usuário: {}", user.username);
+                 }
+
+                 // Gerar tokens JWT
+                 let token = Self::generate_jwt(&user, &config.jwt.secret, &config.jwt.expiration)?;
+                 let original_refresh_token = Uuid::new_v4().to_string();
+                 let refresh_token_hash = Self::hash_token(&original_refresh_token);
+                 let mut refresh_token_db = RefreshToken::new(user.id.clone(), config.jwt.refresh_expiration_days);
+                 refresh_token_db.token_hash = refresh_token_hash;
+
+                 Self::revoke_all_user_refresh_tokens(pool, &user.id)?;
+                 Self::save_refresh_token(pool, &refresh_token_db)?;
+
+                 // Criar sessão com informações de dispositivo (chamada sync)
+                 let _session = DeviceService::create_session_with_device_info(
+                    pool, // Passar &DbPool original
                     &user.id,
-                ),
-            )?;
+                    &ip_address,
+                    &user_agent,
+                    24,
+                 )?; // Chamada síncrona
 
-             Self::log_auth_event(
-                pool,
-                Some(user.id.clone()),
-                if should_lock { "login_failed_locked".to_string() } else { "login_failed_password".to_string() },
-                ip_address.clone(),
-                user_agent.clone(),
-                Some(if should_lock {
-                    format!("Conta bloqueada após {} tentativas.", user.failed_login_attempts)
-                } else {
-                    format!("Senha incorreta (tentativa {}).", user.failed_login_attempts)
-                }),
-            )?;
+                 // Logar evento de login com senha principal
+                 Self::log_auth_event(
+                    pool, // Usar &DbPool original aqui para log sync
+                    Some(user.id.clone()),
+                    "login_success".to_string(),
+                    ip_address.clone(),
+                    user_agent.clone(),
+                    None,
+                )?;
 
-            // Retornar erro apropriado
-            if should_lock {
-                 let locked_until_str = user.locked_until.map_or("N/A".to_string(), |t| t.to_rfc3339());
-                 let message = format!("Conta bloqueada até {}. Verifique seu email para instruções de desbloqueio.", locked_until_str);
-                 return Err(ApiError::AccountLockedError(message));
-            } else {
-                 return Err(ApiError::AuthenticationError("Credenciais inválidas".to_string()));
+                 // Verificar se precisa de verificação de email
+                 let requires_email_verification = config.security.email_verification_enabled;
+                 if requires_email_verification {
+                    use crate::services::email_verification_service::EmailVerificationService;
+                    match EmailVerificationService::generate_and_send_code(
+                        pool,
+                        &user,
+                        ip_address.clone(),
+                        user_agent.clone(),
+                        email_service,
+                        15,
+                    ).await {
+                        Ok(_) => info!("📧 Código de verificação enviado para: {}", user.email),
+                        Err(e) => error!("❌ Falha ao enviar código de verificação para {}: {}", user.email, e),
+                    }
+                 }
+
+                 // Cria a resposta
+                 let auth_response = AuthResponse {
+                     access_token: token,
+                     token_type: "Bearer".to_string(),
+                     expires_in: Self::parse_expiration(&config.jwt.expiration)? * 3600,
+                     refresh_token: original_refresh_token,
+                     user: user.clone(),
+                     requires_email_verification,
+                 };
+
+                 info!("🎉 Login bem-sucedido com senha principal para {}", user.username);
+                 // Disparar webhook de login_success (assíncrono, não bloqueante)
+                 let payload = serde_json::json!({
+                     "user_id": user.id,
+                     "username": user.username,
+                     "ip_address": ip_address,
+                     "user_agent": user_agent,
+                     "timestamp": chrono::Utc::now().to_rfc3339(),
+                 });
+                 let payload = payload.to_string();
+                 actix_web::rt::spawn(async move {
+                     crate::services::webhook_service::WebhookService::trigger_event("login_success", &payload).await;
+                 });
+                 Ok(auth_response)
+            }
+            Ok(false) | Err(_) => { // Senha principal incorreta OU erro na verificação
+                // --- FALHA NO LOGIN (APÓS TENTAR TEMP E PRINCIPAL) ---
+                warn!("🔑 Falha no login (senha principal inválida) para: {}", user.username);
+
+                 // ✨ Verificar se a senha fornecida corresponde a uma TEMPORÁRIA EXPIRADA ✨
+                 match password_argon2::hash_password(&login_dto.password) {
+                    Ok(provided_hash) => {
+                        match temporary_password_repository::find_inactive_by_user_id_and_hash(pool_arc.clone(), &user.id, &provided_hash).await? {
+                            Some(inactive_temp_pass) => {
+                                warn!("🚨 Tentativa de login com senha temporária EXPIRADA detectada para {} (ID Senha: {})!", user.username, inactive_temp_pass.id);
+                                // Enviar email de alerta (descomentado)
+                                if config.email.enabled {
+                                    let _ = email_service.send_expired_temporary_password_attempt_email(&user, &login_dto.password).await;
+                                } else {
+                                    warn!("📧 Envio de email desabilitado. Não foi possível alertar sobre tentativa com senha expirada para {}", user.email);
+                                }
+                                // Logar evento específico
+                                 Self::log_auth_event(
+                                    pool, // Usar &DbPool original aqui para log sync
+                                    Some(user.id.clone()),
+                                    "login_failed_expired_temp_password".to_string(),
+                                    ip_address.clone(),
+                                    user_agent.clone(),
+                                    Some("Tentativa com senha temporária expirada.".to_string()),
+                                )?;
+                                // Retorna erro, mas NÃO incrementa tentativas de falha da conta principal
+                                return Err(ApiError::AuthenticationError("Senha temporária expirada ou inválida 🤷".to_string()));
+                            }
+                            None => {
+                                info!("ℹ️ Senha fornecida não corresponde a nenhuma senha temporária expirada para {}.", user.username);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!("🚨 Erro ao gerar hash da senha fornecida durante a verificação de expiração para {}: {}. Procedendo com falha normal.", user.username, e);
+                    }
+                }
+
+                // --- LÓGICA ORIGINAL DE FALHA (Incrementar tentativas / Bloquear) ---
+                user.failed_login_attempts += 1;
+                warn!(
+                    "🔑 Falha de login (tentativa {}/{}): {}",
+                    user.failed_login_attempts, config.security.max_login_attempts, user.username
+                );
+                let mut should_lock = false;
+                if user.failed_login_attempts >= config.security.max_login_attempts as i32 {
+                   should_lock = true;
+                   let now = Utc::now();
+                   let lockout_duration = Duration::seconds(config.security.lockout_duration_seconds as i64);
+                   user.locked_until = Some(now + lockout_duration);
+                   let token: String = thread_rng()
+                       .sample_iter(&Alphanumeric)
+                       .take(32)
+                       .map(char::from)
+                       .collect();
+                   user.unlock_token = Some(token.clone());
+                   let token_duration = Duration::minutes(config.security.unlock_token_duration_minutes as i64);
+                   user.unlock_token_expires_at = Some(now + token_duration);
+                   warn!("🚫 Conta bloqueada por excesso de tentativas: {}", user.username);
+                   if config.email.enabled {
+                        match email_service.send_account_unlock_email(&user, &token).await {
+                            Ok(_) => info!("📧 Email de desbloqueio enviado para: {}", user.email),
+                            Err(e) => error!("❌ Falha ao enviar email de desbloqueio para {}: {}", user.email, e),
+                        }
+                   } else {
+                        warn!("📧 Envio de email desabilitado. Não foi possível enviar email de desbloqueio para {}", user.email);
+                   }
+                }
+
+                // Atualizar usuário no banco (tentativas ou bloqueio)
+                let conn_sync = pool.get()?;
+                conn_sync.execute(
+                    "UPDATE users SET failed_login_attempts = ?1, locked_until = ?2, unlock_token = ?3, unlock_token_expires_at = ?4, updated_at = ?5 WHERE id = ?6",
+                    (
+                        &user.failed_login_attempts,
+                        &user.locked_until.map(|dt| dt.timestamp()),
+                        &user.unlock_token,
+                        &user.unlock_token_expires_at.map(|dt| dt.timestamp()),
+                        &Utc::now().timestamp(),
+                        &user.id,
+                    ),
+                )?;
+
+                // Logar evento de falha
+                let event_type = if should_lock { "login_failed_locked".to_string() } else { "login_failed_password".to_string() };
+                let details = Some(if should_lock {
+                        let locked_until_str = user.locked_until.map_or("N/A".to_string(), |t| t.to_rfc3339());
+                        format!("Conta bloqueada até {}. (Tentativa {})", locked_until_str, user.failed_login_attempts)
+                    } else {
+                        format!("Senha principal incorreta (tentativa {}).", user.failed_login_attempts)
+                    });
+                Self::log_auth_event(
+                    pool, // Usar &DbPool original aqui para log sync
+                    Some(user.id.clone()),
+                    event_type,
+                    ip_address.clone(),
+                    user_agent.clone(),
+                    details,
+                )?;
+
+                // Retornar erro apropriado
+                 if should_lock {
+                     let locked_until_str = user.locked_until.map_or("N/A".to_string(), |t| t.to_rfc3339());
+                     let message = format!("Conta bloqueada até {}. Verifique seu email para instruções de desbloqueio.", locked_until_str);
+                     Err(ApiError::AccountLockedError(message))
+                 } else {
+                     Err(ApiError::AuthenticationError("Credenciais inválidas 🤷".to_string()))
+                 }
             }
         }
-
-        // 4. Login bem-sucedido - Resetar estado de bloqueio/tentativas
-        if user.failed_login_attempts > 0 || user.locked_until.is_some() {
-            user.failed_login_attempts = 0;
-            user.locked_until = None;
-            user.unlock_token = None;
-            user.unlock_token_expires_at = None;
-            conn.execute(
-                "UPDATE users SET failed_login_attempts = 0, locked_until = NULL, unlock_token = NULL, unlock_token_expires_at = NULL, updated_at = ?1 WHERE id = ?2",
-                (&Utc::now(), &user.id),
-            )?;
-            info!("🔓 Estado de bloqueio resetado para o usuário: {}", user.username);
-        }
-
-        // 5. Gera o token JWT
-        let token = Self::generate_jwt(&user, &config.jwt.secret, &config.jwt.expiration)?;
-
-        // Criar sessão com informações de dispositivo
-        let _session = DeviceService::create_session_with_device_info(
-            pool,
-            &user.id,
-            &ip_address,
-            &user_agent,
-            24, // Duração da sessão em horas
-        )?;
-
-        // 7. Registra o evento de login
-        Self::log_auth_event(
-            pool,
-            Some(user.id.clone()),
-            "login_success".to_string(),
-            ip_address.clone(),
-            user_agent.clone(),
-            None,
-        )?;
-
-        // 8. Gera o refresh token (valor original e hash)
-        let original_refresh_token = Uuid::new_v4().to_string(); // Gerar token original
-        let refresh_token_hash = Self::hash_token(&original_refresh_token); // Calcular hash
-        let mut refresh_token_db = RefreshToken::new(user.id.clone(), config.jwt.refresh_expiration_days);
-        refresh_token_db.token_hash = refresh_token_hash; // Armazenar o hash
-
-        // Revogar tokens de atualização antigos antes de salvar o novo
-        Self::revoke_all_user_refresh_tokens(pool, &user.id)?;
-        Self::save_refresh_token(pool, &refresh_token_db)?; // Salvar o token com hash no DB
-
-        // 9. Gera e envia código de verificação por email
-        let requires_email_verification = config.security.email_verification_enabled;
-        
-        if requires_email_verification {
-            // Importar o serviço de verificação por email
-            use crate::services::email_verification_service::EmailVerificationService;
-            
-            // Gerar e enviar código de verificação
-            match EmailVerificationService::generate_and_send_code(
-                pool,
-                &user,
-                ip_address.clone(),
-                user_agent.clone(),
-                email_service,
-                15, // 15 minutos de expiração
-            ).await {
-                Ok(_) => info!("📧 Código de verificação enviado para: {}", user.email),
-                Err(e) => error!("❌ Falha ao enviar código de verificação para {}: {}", user.email, e),
-            }
-        }
-        
-        // 10. Cria a resposta
-        let auth_response = AuthResponse {
-            access_token: token,
-            token_type: "Bearer".to_string(),
-            expires_in: Self::parse_expiration(&config.jwt.expiration)? * 3600, // Converte horas para segundos
-            refresh_token: original_refresh_token, // Retornar o token original para o cliente
-            requires_email_verification: requires_email_verification, // Indica se o login requer verificação por email 📫
-            user: user.clone(), // Adicionar o usuário na resposta 👤
-        };
-
-        info!("✅ Login bem-sucedido para o usuário: {}", user.username);
-        // Disparar webhook de login_success (assíncrono, não bloqueante)
-        let payload = serde_json::json!({
-            "user_id": user.id,
-            "username": user.username,
-            "ip_address": ip_address,
-            "user_agent": user_agent,
-            "timestamp": chrono::Utc::now().to_rfc3339(),
-        });
-        let payload = payload.to_string();
-        actix_web::rt::spawn(async move {
-            crate::services::webhook_service::WebhookService::trigger_event("login_success", &payload).await;
-        });
-        Ok(auth_response)
     }
 
     // Solicita a recuperação de senha
