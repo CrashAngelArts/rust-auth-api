@@ -28,6 +28,7 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação,
 - Senhas temporárias com limite de uso configurável 🔑
 - Rastreamento e análise de localização de login 🌎
 - Limite configurável de sessões ativas por usuário 🚫
+- Sistema completo de auditoria com registro de ações críticas 📝🔍
 
 ### Funcionalidades 🛠️
 - Sistema completo de autenticação
@@ -52,6 +53,7 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação,
 - Criação de senhas temporárias com limite de uso para acesso controlado 🔑
 - Detecção de logins suspeitos baseada em localização geográfica 🗺️
 - Políticas de limite de sessões com estratégias personalizáveis 🛑
+- Logs de auditoria com suporte a filtros e pesquisa 🔍
 
 ## Requisitos
 
@@ -143,6 +145,9 @@ CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080 # Origens permi
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=Admin@123
 ADMIN_NAME=Administrador
+
+# Auditoria
+AUDIT_LOG_RETENTION_DAYS=90    # Retenção de logs de auditoria em dias
 ```
 
 ## Rotas da API
@@ -179,6 +184,39 @@ ADMIN_NAME=Administrador
 - `POST /verify` - Verificar email de recuperação
 - `DELETE /{id}` - Remover email de recuperação
 - `POST /{id}/resend` - Reenviar email de verificação
+
+### Logs de Auditoria (`/api/admin/audit-logs`) 📝
+
+- `GET /` - Listar logs de auditoria (com filtros e paginação)
+- `GET /{id}` - Obter detalhes de um log específico
+- `DELETE /clean` - Limpar logs antigos (configurável por dias)
+
+## Sistema de Logs de Auditoria 📋
+
+O sistema inclui um mecanismo completo de auditoria para registrar ações críticas e sensíveis:
+
+- Registro detalhado de todas as ações de segurança e administrativas 🔍
+- Diferentes níveis de severidade (Info, Warning, High, Critical) 🌡️
+- Classificação por tipo de ação (Create, Read, Update, Delete, Login, etc.) 📊
+- Registro de metadados como IP, user-agent e detalhes da operação 🌐
+- Busca avançada com diversos filtros (usuário, ação, data, recurso) 🔎
+- Manutenção automática com limpeza de logs antigos ♻️
+- Interface administrativa para análise de logs 👁️
+
+A auditoria captura automaticamente ações como:
+- Logins e tentativas de login 🔑
+- Alterações de permissões e papéis 👑
+- Ações administrativas como exclusão de usuários 👨‍💼
+- Operações de segurança como revogação de tokens 🛡️
+- Falhas de segurança e tentativas suspeitas ⚠️
+- Atualizações de configuração do sistema ⚙️
+
+Cada registro de auditoria inclui:
+- Carimbo de data/hora preciso ⏰
+- Identificação do usuário e/ou administrador 👤
+- Detalhes completos da ação executada 📝
+- Status da operação (sucesso ou falha) ✅❌
+- Dados contextuais para análise de segurança 🔍
 
 ## Múltiplos Emails de Recuperação 📧
 
@@ -238,6 +276,19 @@ O sistema agora suporta autenticação via OAuth com os seguintes provedores:
 - `GET /connections/{user_id}` - Lista conexões OAuth do usuário
 - `DELETE /connections/{user_id}/{connection_id}` - Remove conexão OAuth
 
+## Políticas de Sessão 🚦
+
+O sistema inclui gerenciamento avançado de sessões com:
+
+- Limite configurável de sessões ativas por usuário
+- Diferentes estratégias quando o limite é atingido:
+  - RevokeOldest: Revoga a sessão mais antiga
+  - RevokeLeastRecentlyUsed: Revoga a sessão menos usada
+  - BlockNew: Bloqueia novas sessões
+  - RevokeAll: Revoga todas as sessões existentes
+- Exceções personalizadas para usuários específicos
+- Interface administrativa para gerenciar políticas
+
 ## Manutenção do Sistema 🧹
 
 O sistema possui rotinas de manutenção automática para:
@@ -247,102 +298,18 @@ O sistema possui rotinas de manutenção automática para:
 - Limpeza de sessões de dispositivos expiradas
 - Monitoramento de atividades suspeitas
 - Registro detalhado de eventos de segurança
+- Limpeza de logs de auditoria antigos
 
-Essas rotinas garantem que o sistema permaneça eficiente e seguro ao longo do tempo.
+## Notas de Manutenção ⚙️
 
-## Limite de Sessões Ativas 🔒
+### Última Atualização (Versão Atual)
+- Corrigido erro de importação no módulo `session_policy_controller`
+- Corrigido tipo incorreto em `audit_log_controller` (String vs Option<String>)
+- Otimização do sistema de logs de auditoria
+- Removidas importações não utilizadas em diversos módulos
+- Melhorada tipagem em vários componentes do sistema
 
-O sistema implementa um mecanismo completo de limitação de sessões ativas por usuário:
-
-### Funcionalidades
-
-- Configuração de limite máximo de sessões por usuário 🔢
-- Políticas globais e específicas por usuário 👥
-- Diferentes estratégias de revogação quando o limite é atingido:
-  - Revogação da sessão mais antiga 📅
-  - Revogação da sessão menos utilizada recentemente ⏲️
-  - Bloqueio de novas sessões até que o usuário faça logout manualmente 🚫
-  - Revogação de todas as sessões existentes 🧹
-- Endpoints administrativos para gerenciamento de políticas ⚙️
-- Dashboard para visualização de sessões ativas por usuário 📊
-
-Esta funcionalidade aumenta significativamente a segurança da aplicação ao restringir 
-o número de sessões simultâneas, prevenindo acessos não autorizados e tentativas 
-de força bruta. Os administradores podem configurar diferentes políticas com base 
-em grupos de usuários ou necessidades específicas. 🛡️
-
-## Logs
-
-O sistema gera logs em diferentes níveis:
-- INFO: Informações gerais do sistema
-- WARN: Avisos importantes
-- ERROR: Erros críticos
-- DEBUG: Informações detalhadas para debugging
-
-## Contribuição 🤝
-
-1. Fork o projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/RecursoIncrivel`)
-3. Commit suas mudanças (`git commit -m 'Adiciona algum RecursoIncrivel'`)
-4. Push para a branch (`git push origin feature/RecursoIncrivel`)
-5. Abra um Pull Request
-
-## Demonstração 🎮
-
-O projeto inclui uma página de demonstração para testar a análise de ritmo de digitação:
-
-```bash
-# Abra o arquivo no navegador
-open examples/keystroke-demo.html
-```
-
-## Licença
-
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
-
-## Suporte
-
-Para reportar bugs ou solicitar novas funcionalidades, abra uma issue no repositório.
-
-## Roadmap 🗺️
-
-- [x] Implementar autenticação de dois fatores (2FA)
-- [x] Adicionar rotação de tokens JWT
-- [x] Implementar lista negra de tokens
-- [x] Adicionar análise de ritmo de digitação
-- [x] Implementar rate limiting para keystroke dynamics
-- [x] Adicionar detecção de anomalias em padrões de digitação
-- [x] Implementar proteção contra ataques de força bruta em keystroke
-- [x] Implementar verificação por email após login
-- [x] Implementar gerenciamento de dispositivos conectados
-- [x] Implementar múltiplos emails de recuperação
-- [x] Adicionar manutenção automática de sessões e tokens
-- [x] Implementar autenticação via OAuth
-- [x] Implementar cache de validação de token (Moka)
-- [x] Implementar senhas temporárias com limite de uso
-- [x] Implementar rastreamento e análise de localização de login
-- [ ] Adicionar suporte a múltiplos tenants
-- [ ] Implementar sistema de permissões granular
-- [ ] Adicionar suporte a múltiplos idiomas
-- [ ] Implementar cache de sessões
-- [ ] Adicionar suporte a webhooks
-- [ ] Adicionar autenticação com WebAuthn/FIDO2
-
-### Localizações de Login (`/api/locations`) 🌎
-
-- `GET /` - Listar minhas localizações de login
-- `GET /users/{user_id}` - Listar localizações de login de um usuário (admin)
-- `DELETE /clean` - Remover localizações de login antigas (admin)
-
-## Sistema de Rastreamento de Localização 🗺️
-
-O sistema agora inclui rastreamento e análise de localização de login:
-
-- Detecção de logins suspeitos baseada em análise geográfica 🌍
-- Cálculo de velocidade implícita entre logins consecutivos ⚡
-- Identificação de mudanças improváveis de localização 🔍
-- Pontuação de risco baseada em múltiplos fatores 📊
-- Interface para visualização de histórico de localizações 📱
-- Proteção contra tentativas de acesso de localizações suspeitas 🛡️
-
-Para mais detalhes, consulte a [documentação de rastreamento de localização](docs/location_tracking.md).
+### Compatibilidade
+- Compatível com sistemas Windows, Linux e macOS
+- Suporte total a ambientes containerizados (Docker)
+- Adaptado para ambientes Windows com suporte UTF-8 🪟

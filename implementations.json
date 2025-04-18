@@ -91,9 +91,9 @@
     "priority": "média",
     "category": "Auditoria",
     "code_example": "pub struct AuditLogEntry {\n    pub id: String,\n    pub user_id: Option<String>,\n    pub admin_id: Option<String>,\n    pub action: AuditAction,\n    // ...\n}",
-    "status": "pendente",
+    "status": "concluída",
     "checkout_date": null,
-    "completed_date": null,
+    "completed_date": "2025-04-18 11:48:04",
     "estimated_hours": null,
     "tags": [
       "logs",
