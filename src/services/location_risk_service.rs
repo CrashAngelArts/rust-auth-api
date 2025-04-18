@@ -1,17 +1,14 @@
+use tracing::{debug, error, info};
+use crate::db::DbPool;
 use crate::errors::ApiError;
 use crate::models::login_location::LoginLocation;
 use crate::repositories::login_location_repository::LoginLocationRepository;
+use chrono::Utc;
+use haversine::{self, Units};
+use maxminddb::geoip2;
 use std::net::IpAddr;
 use std::str::FromStr;
 use std::sync::Arc;
-use tracing::{debug, info, warn};
-use haversine::Units;
-use std::collections::HashMap;
-use uuid::Uuid;
-use chrono;
-use r2d2_sqlite::SqliteConnectionManager;
-use r2d2::Pool;
-use std::path::Path;
 
 /// Estrutura para analisar riscos baseados em localização geográfica
 pub struct LocationRiskAnalyzer {
@@ -23,80 +20,69 @@ pub struct LocationRiskAnalyzer {
 impl Default for LocationRiskAnalyzer {
     fn default() -> Self {
         Self {
-            velocity_threshold_km_h: 800.0, // Velocidade máxima plausível em km/h
-            risk_threshold_distance_km: 2000, // Distância em km que representa mudança significativa
-            max_accuracy_radius_km: 200, // Precisão máxima confiável para análise de localização
+            velocity_threshold_km_h: 900.0, // 900 km/h (velocidade aproximada de avião)
+            risk_threshold_distance_km: 100, // Distância mínima para considerar risco
+            max_accuracy_radius_km: 200,    // Raio máximo de precisão aceitável
         }
     }
+}
+
+// Estrutura simplificada para armazenar informações de geolocalização
+#[derive(Debug, Default)]
+struct GeoInfo {
+    country_code: Option<String>,
+    city_name: Option<String>,
+    latitude: Option<f64>,
+    longitude: Option<f64>,
+    accuracy_radius: Option<i32>,
 }
 
 impl LocationRiskAnalyzer {
     /// Inicializa o banco de dados GeoIP
     pub fn init_geoip_db(db_path: &str) -> Result<(), ApiError> {
-        // Verifica se o arquivo existe
-        if !Path::new(db_path).exists() {
-            warn!("⚠️ Banco de dados GeoIP não encontrado: {}", db_path);
-            return Err(ApiError::InternalServerError(format!(
-                "Banco de dados GeoIP não encontrado: {}",
-                db_path
-            )));
+        match std::fs::metadata(db_path) {
+            Ok(_) => {
+                info!("📍 Banco de dados GeoIP encontrado em: {}", db_path);
+                // Tenta carregar o banco para verificar se é válido
+                match maxminddb::Reader::open_readfile(db_path) {
+                    Ok(_) => {
+                        info!("✅ Banco de dados GeoIP carregado com sucesso!");
+                        Ok(())
+                    },
+                    Err(e) => {
+                        error!("❌ Erro ao carregar banco de dados GeoIP: {}", e);
+                        Err(ApiError::InternalServerError(format!("Erro ao carregar banco de dados GeoIP: {}", e)))
+                    }
+                }
+            },
+            Err(e) => {
+                error!("❌ Banco de dados GeoIP não encontrado em {}: {}", db_path, e);
+                Err(ApiError::InternalServerError(format!("Banco de dados GeoIP não encontrado em {}: {}", db_path, e)))
+            }
         }
-        
-        // Em uma implementação real, carregaríamos o banco de dados MaxMind aqui
-        info!("🌎 Banco de dados GeoIP inicializado com sucesso: {}", db_path);
-        Ok(())
     }
 
     /// Analisa o risco com base na localização atual do IP e nos dados históricos
-    pub fn analyze(&self, pool: &Arc<Pool<SqliteConnectionManager>>, user_id: &str, ip_str: &str) -> Result<LoginLocation, ApiError> {
+    pub fn analyze(&self, pool: &DbPool, user_id: &str, ip_str: &str) -> Result<LoginLocation, ApiError> {
         debug!("🔍 Analisando risco para IP: {} do usuário {}", ip_str, user_id);
         
-        // Converter string IP para IpAddr
-        let ip = match IpAddr::from_str(ip_str) {
-            Ok(addr) => addr,
-            Err(e) => {
-                warn!("⚠️ IP inválido fornecido: {}: {}", ip_str, e);
-                let mut errors = HashMap::new();
-                errors.insert("ip".to_string(), vec![format!("IP inválido: {}", e)]);
-                return Err(ApiError::ValidationError(errors));
-            }
-        };
+        // Busca informações de geolocalização do IP
+        let geo_info = self.lookup_geoip(ip_str)?;
         
-        // Buscar última localização do usuário
+        // 2. Obtém a localização mais recente do usuário
         let latest_location = LoginLocationRepository::find_latest(pool, user_id)?;
         
-        // Em uma implementação real, consultaríamos um serviço de GeoIP aqui
-        // Por agora, simulamos alguns dados de localização
-        let country = "BR";
-        let city_name = "São Paulo";
-        let latitude = -23.5505;
-        let longitude = -46.6333;
-        let accuracy_radius = 10;
-        
-        debug!("📍 Localização detectada: {}, {}", city_name, country);
-        
-        // Converte string de user_id para UUID
-        let user_uuid = match Uuid::parse_str(user_id) {
-            Ok(uuid) => uuid,
-            Err(e) => {
-                warn!("⚠️ UUID inválido para user_id: {}: {}", user_id, e);
-                let mut errors = HashMap::new();
-                errors.insert("user_id".to_string(), vec![format!("User ID inválido: {}", e)]);
-                return Err(ApiError::ValidationError(errors));
-            }
-        };
-        
-        // Cria o objeto de localização padrão
+        // 3. Cria a localização atual para análise
         let mut login_location = LoginLocation {
-            id: Uuid::new_v4().to_string(),
-            user_id: user_uuid.to_string(),
-            ip_address: ip.to_string(),
-            country_code: Some(country.to_string()),
-            city: Some(city_name.to_string()),
-            latitude: Some(latitude),
-            longitude: Some(longitude),
-            accuracy_radius: Some(accuracy_radius as i32),
-            created_at: chrono::Utc::now(),
+            id: uuid::Uuid::new_v4().to_string(),
+            user_id: user_id.to_string(),
+            ip_address: ip_str.to_string(),
+            country_code: geo_info.country_code,
+            city: geo_info.city_name,
+            latitude: geo_info.latitude,
+            longitude: geo_info.longitude,
+            accuracy_radius: geo_info.accuracy_radius,
+            created_at: Utc::now(),
             risk_score: Some(0.0),
             is_suspicious: false,
             suspicious_reason: None,
@@ -198,5 +184,57 @@ impl LocationRiskAnalyzer {
         LoginLocationRepository::save(pool, &login_location)?;
         
         Ok(login_location)
+    }
+    
+    // Busca informações de geolocalização a partir de um IP
+    fn lookup_geoip(&self, ip_str: &str) -> Result<GeoInfo, ApiError> {
+        // Caminho para o banco de dados GeoIP
+        let geoip_path = "data/GeoLite2-City.mmdb";
+        
+        // Converte a string de IP para IpAddr
+        let ip: IpAddr = match IpAddr::from_str(ip_str) {
+            Ok(ip) => ip,
+            Err(e) => {
+                error!("❌ IP inválido: {} - {}", ip_str, e);
+                return Err(ApiError::BadRequest(format!("IP inválido: {}", ip_str)));
+            }
+        };
+        
+        // Carrega o banco de dados MaxMind
+        let reader = match maxminddb::Reader::open_readfile(geoip_path) {
+            Ok(r) => r,
+            Err(e) => {
+                error!("❌ Erro ao abrir banco de dados GeoIP: {}", e);
+                return Err(ApiError::InternalServerError("Erro ao acessar banco de dados de geolocalização".to_string()));
+            }
+        };
+        
+        // Busca informações do IP
+        let mut geo_info = GeoInfo::default();
+        
+        match reader.lookup::<maxminddb::geoip2::City>(ip) {
+            Ok(city_option) => {
+                if let Some(city) = city_option {
+                    // Extrair dados relevantes
+                    geo_info.country_code = city.country.as_ref().and_then(|c| c.iso_code.map(|s| s.to_string()));
+                    geo_info.city_name = city.city.as_ref().and_then(|c| 
+                        c.names.as_ref().and_then(|n| 
+                            n.get("pt").or_else(|| n.get("en")).map(|s| s.to_string())
+                        )
+                    );
+                    geo_info.latitude = city.location.as_ref().and_then(|l| l.latitude);
+                    geo_info.longitude = city.location.as_ref().and_then(|l| l.longitude);
+                    geo_info.accuracy_radius = city.location.as_ref().and_then(|l| l.accuracy_radius.map(|r| r as i32));
+                    
+                    debug!("📍 Informações de geolocalização encontradas: {:?}", geo_info);
+                }
+                
+                Ok(geo_info)
+            },
+            Err(e) => {
+                error!("❌ Erro ao buscar informações de geolocalização: {}", e);
+                Err(ApiError::InternalServerError("Erro ao buscar informações de geolocalização".to_string()))
+            }
+        }
     }
 } 

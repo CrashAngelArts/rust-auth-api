@@ -68,9 +68,6 @@ impl AuthService {
         user_agent: Option<String>,
         email_service: &EmailService,
     ) -> Result<AuthResponse, ApiError> {
-        // Usar Arc<DbPool> para chamadas async dentro
-        let pool_arc = Arc::new(pool.clone());
-
         // Obtém o usuário pelo email ou nome de usuário
         let mut user = UserService::get_user_by_email_or_username(pool, &login_dto.username_or_email)
             .map_err(|_| ApiError::AuthenticationError("Credenciais inválidas 🤷".to_string()))?;
@@ -106,6 +103,7 @@ impl AuthService {
         }
 
         // ✨ 3. TENTA VERIFICAR SENHA TEMPORÁRIA PRIMEIRO ✨
+        let pool_arc = Arc::new(pool.clone());
         let active_temp_password: Option<TemporaryPassword> = temporary_password_repository::find_active_by_user_id(pool_arc.clone(), &user.id).await?;
 
         if let Some(temp_pass) = active_temp_password {
@@ -160,7 +158,7 @@ impl AuthService {
                     if let Some(ip) = ip_address.clone() {
                         // Analisar a localização do IP e padrões temporais em uma thread separada para não bloquear o login
                         let user_id_clone = user.id.clone();
-                        let pool_clone = pool_arc.clone();
+                        let pool_clone = pool.clone();
                         let timezone = login_dto.timezone.clone();
                         
                         tokio::spawn(async move {
@@ -283,7 +281,7 @@ impl AuthService {
                  if let Some(ip) = ip_address.clone() {
                      // Analisar a localização do IP e padrões temporais em uma thread separada para não bloquear o login
                      let user_id_clone = user.id.clone();
-                     let pool_clone = pool_arc.clone();
+                     let pool_clone = pool.clone();
                      let timezone = login_dto.timezone.clone();
                      
                      tokio::spawn(async move {

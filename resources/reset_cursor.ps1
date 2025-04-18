@@ -1,1 +1,0 @@
-irm https://raw.githubusercontent.com/yuaotian/go-cursor-help/main/scripts/install.ps1 | iex

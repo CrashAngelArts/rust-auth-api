@@ -40,9 +40,9 @@
     "priority": "alta",
     "category": "Segurança",
     "code_example": "pub struct TimePatternAnalyzer {\n    pub unusual_hour_threshold: f64,\n    pub timezone_mismatch_weight: f64,\n}",
-    "status": "pendente",
+    "status": "concluída",
     "checkout_date": null,
-    "completed_date": null,
+    "completed_date": "2025-04-18 08:01:05",
     "estimated_hours": null,
     "tags": [
       "análise de risco",
