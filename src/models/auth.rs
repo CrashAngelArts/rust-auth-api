@@ -22,6 +22,9 @@ pub struct LoginDto {
 
     #[validate(length(min = 1, message = "Senha é obrigatória"))]
     pub password: String,
+    
+    /// Fuso horário do cliente (formato TZ, ex: "America/Sao_Paulo")
+    pub timezone: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate)]

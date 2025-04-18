@@ -14,6 +14,7 @@ pub mod webhook_service;
 pub mod webauthn_service;
 pub mod recovery_code_service;
 pub mod location_risk_service;
+pub mod time_pattern_service;
 
 
 // Re-exportar structs/enums para facilitar imports externos

@@ -24,6 +24,7 @@ use crate::repositories::temporary_password_repository;
 use crate::utils::password_argon2;
 use crate::models::temporary_password::TemporaryPassword;
 use crate::services::location_risk_service::LocationRiskAnalyzer;
+use crate::services::time_pattern_service::TimePatternAnalyzer;
 use tokio;
 
 pub struct AuthService;
@@ -157,11 +158,13 @@ impl AuthService {
 
                     // Analisar localização se o IP estiver disponível
                     if let Some(ip) = ip_address.clone() {
-                        // Analisar a localização do IP em uma thread separada para não bloquear o login
+                        // Analisar a localização do IP e padrões temporais em uma thread separada para não bloquear o login
                         let user_id_clone = user.id.clone();
                         let pool_clone = pool_arc.clone();
+                        let timezone = login_dto.timezone.clone();
                         
                         tokio::spawn(async move {
+                            // Análise de localização
                             let analyzer = LocationRiskAnalyzer::default();
                             match analyzer.analyze(&pool_clone, &user_id_clone, &ip) {
                                 Ok(location) => {
@@ -172,6 +175,25 @@ impl AuthService {
                                         );
                                     } else {
                                         info!("✅ Localização de login registrada para o usuário {}", user_id_clone);
+                                    }
+                                    
+                                    // Análise de padrões temporais
+                                    let time_analyzer = TimePatternAnalyzer::default();
+                                    match time_analyzer.analyze_login(&pool_clone, &user_id_clone, Utc::now(), timezone) {
+                                        Ok(anomalies) => {
+                                            if !anomalies.is_empty() {
+                                                warn!("⚠️ {} anomalias temporais detectadas no login do usuário {}", 
+                                                    anomalies.len(), user_id_clone);
+                                                
+                                                for anomaly in anomalies {
+                                                    warn!("🕒 Anomalia: {} (risco: {:.2}) - {}", 
+                                                        format!("{:?}", anomaly.anomaly_type), 
+                                                        anomaly.risk_level,
+                                                        anomaly.description);
+                                                }
+                                            }
+                                        },
+                                        Err(e) => error!("❌ Erro ao analisar padrões temporais: {}", e),
                                     }
                                 },
                                 Err(e) => error!("❌ Erro ao analisar localização de login: {}", e),
@@ -256,6 +278,51 @@ impl AuthService {
                     &user_agent,
                     24,
                  )?; // Chamada síncrona
+
+                 // Analisar localização se o IP estiver disponível
+                 if let Some(ip) = ip_address.clone() {
+                     // Analisar a localização do IP e padrões temporais em uma thread separada para não bloquear o login
+                     let user_id_clone = user.id.clone();
+                     let pool_clone = pool_arc.clone();
+                     let timezone = login_dto.timezone.clone();
+                     
+                     tokio::spawn(async move {
+                         // Análise de localização
+                         let analyzer = LocationRiskAnalyzer::default();
+                         match analyzer.analyze(&pool_clone, &user_id_clone, &ip) {
+                             Ok(location) => {
+                                 if location.is_suspicious {
+                                     warn!("⚠️ Login em localização suspeita para o usuário {}! Motivo: {}", 
+                                         user_id_clone, 
+                                         location.suspicious_reason.as_deref().unwrap_or("desconhecido")
+                                     );
+                                 } else {
+                                     info!("✅ Localização de login registrada para o usuário {}", user_id_clone);
+                                 }
+                                 
+                                 // Análise de padrões temporais
+                                 let time_analyzer = TimePatternAnalyzer::default();
+                                 match time_analyzer.analyze_login(&pool_clone, &user_id_clone, Utc::now(), timezone) {
+                                     Ok(anomalies) => {
+                                         if !anomalies.is_empty() {
+                                             warn!("⚠️ {} anomalias temporais detectadas no login do usuário {}", 
+                                                 anomalies.len(), user_id_clone);
+                                             
+                                             for anomaly in anomalies {
+                                                 warn!("🕒 Anomalia: {} (risco: {:.2}) - {}", 
+                                                     format!("{:?}", anomaly.anomaly_type), 
+                                                     anomaly.risk_level,
+                                                     anomaly.description);
+                                             }
+                                         }
+                                     },
+                                     Err(e) => error!("❌ Erro ao analisar padrões temporais: {}", e),
+                                 }
+                             },
+                             Err(e) => error!("❌ Erro ao analisar localização de login: {}", e),
+                         }
+                     });
+                 }
 
                  // Logar evento de login com senha principal
                  Self::log_auth_event(
