@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# Script para gerenciar tarefas de implementação
 
 import os
 import json
@@ -82,28 +83,28 @@ class Implementation:
 
     def details(self) -> str:
         result = [
-            f"🔹 ID: {self.id}",
-            f"🔹 Título: {self.title}",
-            f"🔹 Prioridade: {self.priority.value}",
-            f"🔹 Categoria: {self.category}",
-            f"🔹 Status: {self.status.value}",
-            f"🔹 Descrição: {self.description}"
+            f"ID: {self.id}",
+            f"Titulo: {self.title}",
+            f"Prioridade: {self.priority.value}",
+            f"Categoria: {self.category}",
+            f"Status: {self.status.value}",
+            f"Descricao: {self.description}"
         ]
         
         if self.checkout_date:
-            result.append(f"🔹 Data de checkout: {self.checkout_date}")
+            result.append(f"Data de checkout: {self.checkout_date}")
         
         if self.completed_date:
-            result.append(f"🔹 Data de conclusão: {self.completed_date}")
+            result.append(f"Data de conclusao: {self.completed_date}")
         
         if self.estimated_hours:
-            result.append(f"🔹 Horas estimadas: {self.estimated_hours}")
+            result.append(f"Horas estimadas: {self.estimated_hours}")
             
         if self.tags:
-            result.append(f"🔹 Tags: {', '.join(self.tags)}")
+            result.append(f"Tags: {', '.join(self.tags)}")
             
         if self.code_example:
-            result.append("\n🔹 Exemplo de código:")
+            result.append("\nExemplo de codigo:")
             result.append(f"```\n{self.code_example}\n```")
             
         return "\n".join(result)
@@ -465,9 +466,9 @@ def main():
     elif args.command == "next":
         next_implementation = manager.get_next_implementation()
         if not next_implementation:
-            print("\n✨ Não há implementações pendentes! Tudo concluído!")
+            print("\nNao ha implementacoes pendentes! Tudo concluido!")
         else:
-            print("\n⭐ Próxima implementação recomendada:\n")
+            print("\nProxima implementacao recomendada:\n")
             print(next_implementation.details())
     
     elif args.command == "show":
