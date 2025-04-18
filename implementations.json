@@ -23,9 +23,9 @@
     "priority": "alta",
     "category": "Segurança",
     "code_example": "pub struct LocationRiskAnalyzer {\n    pub geo_database: GeoIpDatabase,\n    pub velocity_threshold_km_h: f64,\n    pub risk_threshold_distance_km: u32,\n}",
-    "status": "em progresso",
+    "status": "concluída",
     "checkout_date": "2025-04-18 02:55:09",
-    "completed_date": null,
+    "completed_date": "2025-04-18 03:45:42",
     "estimated_hours": null,
     "tags": [
       "análise de risco",
