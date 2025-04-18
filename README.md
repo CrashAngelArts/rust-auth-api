@@ -27,6 +27,7 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação,
 - Autorização granular baseada em permissões via middleware 🔐
 - Senhas temporárias com limite de uso configurável 🔑
 - Rastreamento e análise de localização de login 🌎
+- Limite configurável de sessões ativas por usuário 🚫
 
 ### Funcionalidades 🛠️
 - Sistema completo de autenticação
@@ -50,6 +51,7 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação,
 - Verificação de permissões de usuário via serviço RBAC ✅
 - Criação de senhas temporárias com limite de uso para acesso controlado 🔑
 - Detecção de logins suspeitos baseada em localização geográfica 🗺️
+- Políticas de limite de sessões com estratégias personalizáveis 🛑
 
 ## Requisitos
 
@@ -247,6 +249,27 @@ O sistema possui rotinas de manutenção automática para:
 - Registro detalhado de eventos de segurança
 
 Essas rotinas garantem que o sistema permaneça eficiente e seguro ao longo do tempo.
+
+## Limite de Sessões Ativas 🔒
+
+O sistema implementa um mecanismo completo de limitação de sessões ativas por usuário:
+
+### Funcionalidades
+
+- Configuração de limite máximo de sessões por usuário 🔢
+- Políticas globais e específicas por usuário 👥
+- Diferentes estratégias de revogação quando o limite é atingido:
+  - Revogação da sessão mais antiga 📅
+  - Revogação da sessão menos utilizada recentemente ⏲️
+  - Bloqueio de novas sessões até que o usuário faça logout manualmente 🚫
+  - Revogação de todas as sessões existentes 🧹
+- Endpoints administrativos para gerenciamento de políticas ⚙️
+- Dashboard para visualização de sessões ativas por usuário 📊
+
+Esta funcionalidade aumenta significativamente a segurança da aplicação ao restringir 
+o número de sessões simultâneas, prevenindo acessos não autorizados e tentativas 
+de força bruta. Os administradores podem configurar diferentes políticas com base 
+em grupos de usuários ou necessidades específicas. 🛡️
 
 ## Logs
 
