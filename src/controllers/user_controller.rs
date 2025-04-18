@@ -6,7 +6,7 @@ use crate::models::user::{ChangePasswordDto, UpdateUserDto, UserResponse};
 use crate::services::user_service::UserService;
 use actix_web::{web, HttpResponse, Responder};
 use validator::Validate;
-use crate::models::temporary_password::{CreateTemporaryPasswordDto, TemporaryPasswordResponse};
+use crate::models::temporary_password::CreateTemporaryPasswordDto;
 use crate::config::Config;
 // use std::sync::Arc; // Removido
 
