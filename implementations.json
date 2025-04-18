@@ -74,9 +74,9 @@
     "priority": "média",
     "category": "Gerenciamento de Sessões",
     "code_example": "pub struct SessionLimitPolicy {\n    pub max_sessions_per_user: u32,\n    pub revoke_strategy: RevocationStrategy,\n}",
-    "status": "pendente",
+    "status": "concluída",
     "checkout_date": null,
-    "completed_date": null,
+    "completed_date": "2025-04-18 10:25:28",
     "estimated_hours": null,
     "tags": [
       "sessões",

@@ -102,6 +102,13 @@ async fn main() -> std::io::Result<()> {
     let rbac_service = RbacService::new(pool.clone());
     info!("✅ Serviço RBAC inicializado com sucesso");
 
+    // Inicializa o serviço de logs de auditoria
+    if let Err(e) = services::AuditLogService::init(&pool) {
+        warn!("⚠️ Erro ao inicializar serviço de logs de auditoria: {}. Continuando...", e);
+    } else {
+        info!("✅ Serviço de logs de auditoria inicializado com sucesso");
+    }
+
     // Configura os middlewares de segurança
     let (security_headers, _csrf_protection) = configure_security(&config.jwt.secret);
     

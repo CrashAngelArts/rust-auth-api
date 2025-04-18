@@ -19,5 +19,6 @@ pub mod login_location;
 pub mod api;
 pub mod time_pattern;
 pub mod session_policy;
+pub mod audit_log;
 
 

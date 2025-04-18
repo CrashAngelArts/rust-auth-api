@@ -16,5 +16,6 @@ pub mod recovery_code_controller;
 pub mod location_controller;
 pub mod time_pattern_controller;
 pub mod session_policy_controller;
+pub mod audit_log_controller;
 
 

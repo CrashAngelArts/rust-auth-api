@@ -17,6 +17,8 @@ use crate::controllers::{
     recovery_code_controller, // <-- Novo controlador de códigos de recuperação 🔑
     location_controller, // <-- Novo controlador de localizações de login 🌎
     time_pattern_controller, // <-- Adicionar import para time_pattern_controller
+    audit_log_controller, // <-- Adicionar import para audit_log_controller
+    session_policy_controller, // <-- Adicionar import para session_policy_controller
 };
 use crate::middleware::{
     auth::{AdminAuth, JwtAuth},
@@ -236,6 +238,19 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
                 web::scope("/time-patterns")
                     .wrap(jwt_auth.clone())
                     .configure(time_pattern_controller::config)
+            )
+            // Rotas de políticas de sessão
+            .service(
+                web::scope("/sessions/policy")
+                    .wrap(jwt_auth.clone())
+                    .configure(session_policy_controller::config)
+            )
+            // Rotas de logs de auditoria
+            .service(
+                web::scope("/audit-logs")
+                    .wrap(jwt_auth.clone())
+                    .wrap(admin_auth.clone())
+                    .configure(audit_log_controller::config)
             )
     )
     .service(

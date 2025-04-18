@@ -16,6 +16,7 @@ pub mod recovery_code_service;
 pub mod location_risk_service;
 pub mod time_pattern_service;
 pub mod session_policy_service;
+pub mod audit_log_service;
 
 
 // Re-exportar structs/enums para facilitar imports externos
@@ -24,3 +25,4 @@ pub mod session_policy_service;
 pub use rbac_service::RbacService;
 pub mod security_question_service; 
 pub use security_question_service::SecurityQuestionService; 
+pub use audit_log_service::AuditLogService;
