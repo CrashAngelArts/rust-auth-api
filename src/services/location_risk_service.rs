@@ -9,6 +9,13 @@ use maxminddb::geoip2;
 use std::net::IpAddr;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::sync::RwLock;
+use lazy_static::lazy_static;
+
+// Variável global para armazenar o caminho do banco de dados GeoIP
+lazy_static! {
+    static ref GEOIP_DB_PATH: RwLock<String> = RwLock::new(String::from("data/GeoLite2-City.mmdb"));
+}
 
 /// Estrutura para analisar riscos baseados em localização geográfica
 pub struct LocationRiskAnalyzer {
@@ -47,6 +54,10 @@ impl LocationRiskAnalyzer {
                 match maxminddb::Reader::open_readfile(db_path) {
                     Ok(_) => {
                         info!("✅ Banco de dados GeoIP carregado com sucesso!");
+                        // Armazena o caminho na variável global
+                        if let Ok(mut path) = GEOIP_DB_PATH.write() {
+                            *path = db_path.to_string();
+                        }
                         Ok(())
                     },
                     Err(e) => {
@@ -188,8 +199,14 @@ impl LocationRiskAnalyzer {
     
     // Busca informações de geolocalização a partir de um IP
     fn lookup_geoip(&self, ip_str: &str) -> Result<GeoInfo, ApiError> {
-        // Caminho para o banco de dados GeoIP
-        let geoip_path = "data/GeoLite2-City.mmdb";
+        // Obtém o caminho do banco de dados GeoIP da variável global
+        let geoip_path = match GEOIP_DB_PATH.read() {
+            Ok(path) => path.clone(),
+            Err(_) => {
+                error!("❌ Erro ao acessar caminho do banco de dados GeoIP");
+                return Err(ApiError::InternalServerError("Erro ao acessar configuração de geolocalização".to_string()));
+            }
+        };
         
         // Converte a string de IP para IpAddr
         let ip: IpAddr = match IpAddr::from_str(ip_str) {
@@ -201,7 +218,7 @@ impl LocationRiskAnalyzer {
         };
         
         // Carrega o banco de dados MaxMind
-        let reader = match maxminddb::Reader::open_readfile(geoip_path) {
+        let reader = match maxminddb::Reader::open_readfile(&geoip_path) {
             Ok(r) => r,
             Err(e) => {
                 error!("❌ Erro ao abrir banco de dados GeoIP: {}", e);

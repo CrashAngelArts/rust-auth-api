@@ -102,7 +102,8 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
                                     .route("", web::get().to(device_controller::list_devices))
                                     .route("/{id}", web::get().to(device_controller::get_device))
                                     .route("/{id}", web::put().to(device_controller::update_device))
-                                    .route("/{id}", web::delete().to(device_controller::revoke_device)),
+                                    .route("/{id}", web::delete().to(device_controller::revoke_device))
+                                    .route("/{id}/set-current", web::post().to(device_controller::set_as_current_device)),
                             )
                             // Rotas para gerenciamento de emails de recuperação 📧
                             .service(
