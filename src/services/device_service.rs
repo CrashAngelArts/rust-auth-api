@@ -1,10 +1,11 @@
 use crate::db::DbPool;
-use crate::errors::ApiError;
+use crate::errors::{ApiError, ErrorResponse};
 use crate::models::auth::Session;
 use crate::models::device::{DeviceInfo, DeviceListResponse};
+use crate::services::session_policy_service::SessionPolicyService;
 use chrono::Utc;
 use rusqlite::params;
-use tracing::info;
+use tracing::{info, warn};
 use woothee::parser::Parser;
 
 pub struct DeviceService;
@@ -228,6 +229,28 @@ impl DeviceService {
         user_agent: &Option<String>,
         duration_hours: i64,
     ) -> Result<Session, ApiError> {
+        // Verificar política de limite de sessões
+        match SessionPolicyService::check_and_apply_policy(pool, user_id) {
+            Ok(allowed) => {
+                if !allowed {
+                    // Se não for permitido criar uma nova sessão
+                    return Err(ApiError::TooManyRequests(
+                        ErrorResponse {
+                            status: 429,
+                            message: "Limite de sessões atingido. Por favor, faça logout em outro dispositivo e tente novamente 🔒".to_string(),
+                            error_code: "SESSION_LIMIT_EXCEEDED".to_string(),
+                            error_details: None,
+                            validation_details: None,
+                        }
+                    ));
+                }
+            },
+            Err(e) => {
+                // Em caso de erro na verificação da política, logar e continuar (não bloquear o login)
+                warn!("⚠️ Erro ao verificar política de sessão: {}. Continuando com o login.", e);
+            }
+        }
+        
         let conn = pool.get()?;
         
         // Criar a sessão com valores padrão se não fornecidos
@@ -291,7 +314,13 @@ impl DeviceService {
             [&session.user_id, &session.id],
         )?;
         
-        info!("📱 Nova sessão criada para o dispositivo: {}", device_name);
+        // Obtém a política atual e o número de sessões para logging
+        if let Ok(summary) = SessionPolicyService::get_policy_summary(pool, user_id) {
+            info!("📱 Nova sessão criada para o dispositivo: {} (Sessões: {}/{})", 
+                  device_name, summary.current_sessions, summary.max_sessions);
+        } else {
+            info!("📱 Nova sessão criada para o dispositivo: {}", device_name);
+        }
         
         Ok(session)
     }
