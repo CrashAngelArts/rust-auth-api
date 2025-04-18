@@ -1,11 +1,12 @@
 use crate::db::DbPool;
 use crate::errors::ApiError;
-use crate::models::time_pattern::{TimeAnomaly, TimeAnomalyType, TimePatternSummary, UserTimePattern};
+use crate::models::time_pattern::{TimePattern, TimePatternType, DayTimeRange};
 use crate::repositories::time_pattern_repository::TimePatternRepository;
-use chrono::{DateTime, Datelike, Duration, NaiveTime, TimeZone, Timelike, Utc};
+use chrono::{DateTime, Datelike, Duration, Timelike, Utc};
+use tracing::{debug, info};
+use crate::models::time_pattern::{TimeAnomaly, TimeAnomalyType, TimePatternSummary, UserTimePattern};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 /// Serviço para análise de padrões temporais de login

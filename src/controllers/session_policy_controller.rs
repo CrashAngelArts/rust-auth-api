@@ -2,8 +2,8 @@ use crate::db::DbPool;
 use crate::errors::ApiError;
 use crate::middleware::auth::AuthenticatedUser;
 use crate::models::response::ApiResponse;
-use crate::models::session_policy::{RevocationStrategy, SessionLimitPolicy, SessionLimitPolicyDto};
-use crate::services::session_policy_service::{SessionPolicyService, SessionPolicySummary};
+use crate::models::session_policy::{SessionLimitPolicy, SessionLimitPolicyDto};
+use crate::services::session_policy_service::SessionPolicyService;
 use actix_web::{web, HttpResponse, Responder};
 use tracing::info;
 

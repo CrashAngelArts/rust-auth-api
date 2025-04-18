@@ -283,7 +283,7 @@ pub async fn clean_audit_logs(
     let days_to_keep = query.days_to_keep.max(7);
     
     // Registrar esta ação como uma ação administrativa
-    let (ip, user_agent) = AuditLogService::extract_request_info(&req);
+    let (_ip, _user_agent) = AuditLogService::extract_request_info(&req);
     
     // Limpar os logs
     let removed_count = AuditLogService::clean_old_logs(&pool, days_to_keep)?;
