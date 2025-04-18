@@ -16,6 +16,7 @@ use crate::controllers::{
     webauthn_controller, // <-- Novo controlador de WebAuthn 🔐
     recovery_code_controller, // <-- Novo controlador de códigos de recuperação 🔑
     location_controller, // <-- Novo controlador de localizações de login 🌎
+    time_pattern_controller, // <-- Adicionar import para time_pattern_controller
 };
 use crate::middleware::{
     auth::{AdminAuth, JwtAuth},
@@ -222,7 +223,19 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
                 web::scope("/locations")
                     .wrap(jwt_auth.clone())
                     .configure(location_controller::config) // Usar a função config para configurar as rotas
-            ),
+            )
+            // Rotas de verificação de email
+            .service(
+                web::scope("/verification")
+                    .wrap(jwt_auth.clone())
+                    .configure(email_verification_controller::config)
+            )
+            // Rotas de padrões temporais
+            .service(
+                web::scope("/time-patterns")
+                    .wrap(jwt_auth.clone())
+                    .configure(time_pattern_controller::config)
+            )
     )
     .service(
         // Rota raiz para servir o arquivo index.html da pasta static

@@ -90,3 +90,17 @@ pub async fn clean_expired_codes(
         &message,
     )))
 }
+
+/// Configuração das rotas do controlador
+pub fn config(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::resource("/verify")
+            .route(web::post().to(verify_email_code))
+    )
+    .service(
+        web::resource("/resend")
+            .route(web::post().to(resend_verification_code))
+    );
+    
+    info!("📧 Rotas de verificação de email configuradas!");
+}
