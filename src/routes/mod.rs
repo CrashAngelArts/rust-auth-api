@@ -26,9 +26,10 @@ use crate::middleware::{
     csrf::CsrfProtect, // <-- Adicionado middleware CSRF 🛡️🍪
 };
 use crate::services::keystroke_security_service::KeystrokeSecurityService;
-use actix_web::{web, HttpResponse};
+use actix_web::{web, HttpResponse, Responder, post, get};
 use tracing::info;
 use std::time::Duration;
+use crate::errors::ApiError;
 
 // Configura as rotas da API
 pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
@@ -139,52 +140,49 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, config: &Config) {
             )
             .service(
                 web::scope("/users")
-                    .wrap(jwt_auth.clone()) // Proteger todas as rotas de usuário
-                    .wrap(email_verification_check.clone()) // Verificar se o usuário confirmou o código de email 📧
+                    .wrap(jwt_auth.clone())
+                    .wrap(email_verification_check.clone())
+                    // Rota para listar todos (apenas admin)
                     .service(
                         web::resource("")
-                            .wrap(admin_auth.clone()) // Apenas admin pode listar todos
-                            .route(web::get().to(user_controller::list_users)),
+                            .wrap(admin_auth.clone())
+                            .route(web::get().to(user_controller::list_users))
                     )
+                    // Rotas específicas por ID
                     .service(
                         web::resource("/{id}")
-                            // GET /users/{id} - Admin ou o próprio usuário podem acessar
                             .route(web::get().to(user_controller::get_user))
-                            // PUT /users/{id} - Admin ou o próprio usuário podem atualizar
                             .route(web::put().to(user_controller::update_user))
-                            // DELETE /users/{id} - Apenas admin pode deletar
-                            .route(web::delete().wrap(admin_auth.clone()).to(user_controller::delete_user)),
+                            .route(web::delete().wrap(admin_auth.clone()).to(user_controller::delete_user))
                     )
-                    // POST /users/{id}/change-password - Apenas o próprio usuário pode mudar a senha
-                    .route("/{id}/change-password", web::post().to(user_controller::change_password))
-                    // Rotas para autenticação de dois fatores (2FA)
+                    // Rota para alterar senha (usa ID na URL)
+                    .service(
+                        web::resource("/{id}/change-password")
+                            .route(web::post().to(user_controller::change_password))
+                    )
+                    // ✨ Rota para definir senha temporária (rota "/me/")
+                    .service(
+                        web::resource("/me/temporary-password")
+                            .route(web::post().to(user_controller::set_temporary_password_handler))
+                    )
+                    // Rotas para autenticação de dois fatores (2FA) - Usam {id}
                     .service(
                         web::scope("/{id}/2fa")
-                            // GET /users/{id}/2fa/setup - Inicia a configuração 2FA
                             .route("/setup", web::get().to(two_factor_controller::setup_2fa))
-                            // POST /users/{id}/2fa/enable - Ativa 2FA
                             .route("/enable", web::post().to(two_factor_controller::enable_2fa))
-                            // POST /users/{id}/2fa/disable - Desativa 2FA
                             .route("/disable", web::post().to(two_factor_controller::disable_2fa))
-                            // POST /users/{id}/2fa/backup-codes - Regenera códigos de backup
                             .route("/backup-codes", web::post().to(two_factor_controller::regenerate_backup_codes))
-                            // GET /users/{id}/2fa/status - Verifica o status do 2FA
-                            .route("/status", web::get().to(two_factor_controller::get_2fa_status)),
+                            .route("/status", web::get().to(two_factor_controller::get_2fa_status))
                     )
-                    // Rotas para verificação de ritmo de digitação (keystroke dynamics)
+                    // Rotas para verificação de ritmo de digitação - Usam {id}
                     .service(
                         web::scope("/{id}/keystroke")
-                            // Aplicar rate limiter específico para keystroke
                             .wrap(keystroke_rate_limiter.clone())
-                            // POST /users/{id}/keystroke/register - Registra um novo padrão de digitação
                             .route("/register", web::post().to(keystroke_controller::register_keystroke_pattern))
-                            // POST /users/{id}/keystroke/verify - Verifica um padrão de digitação
                             .route("/verify", web::post().to(keystroke_controller::verify_keystroke_pattern))
-                            // PUT /users/{id}/keystroke/toggle - Habilita/desabilita a verificação
                             .route("/toggle", web::put().to(keystroke_controller::toggle_keystroke_verification))
-                            // GET /users/{id}/keystroke/status - Verifica o status da verificação
-                            .route("/status", web::get().to(keystroke_controller::get_keystroke_status)),
-                    ),
+                            .route("/status", web::get().to(keystroke_controller::get_keystroke_status))
+                    )
             )
             .service(
                 web::scope("/health")

@@ -6,6 +6,9 @@ use crate::models::user::{ChangePasswordDto, UpdateUserDto, UserResponse};
 use crate::services::user_service::UserService;
 use actix_web::{web, HttpResponse, Responder};
 use validator::Validate;
+use crate::models::temporary_password::{CreateTemporaryPasswordDto, TemporaryPasswordResponse};
+use crate::config::Config;
+// use std::sync::Arc; // Removido
 
 // Lista todos os usuários (admin)
 pub async fn list_users(
@@ -160,6 +163,31 @@ pub async fn delete_user(
     // Retorna a resposta
     Ok(HttpResponse::Ok().json(ApiResponse::<()>::message(
         "Usuário removido com sucesso",
+    )))
+}
+
+// ✨ Define a senha temporária para o usuário autenticado
+pub async fn set_temporary_password_handler(
+    pool: web::Data<DbPool>, 
+    dto: web::Json<CreateTemporaryPasswordDto>,
+    claims: web::ReqData<TokenClaims>,
+    config: web::Data<Config>,
+) -> Result<HttpResponse, ApiError> {
+    // Extrair ID do usuário autenticado a partir do token JWT
+    let user_id = claims.sub.clone();
+    
+    // Chamar o serviço para criar a senha temporária
+    let temp_password_response = UserService::set_temporary_password(
+        pool.into_inner(),
+        &user_id,
+        dto.into_inner(),
+        &config,
+    ).await?;
+    
+    // Retornar resposta de sucesso com detalhes da senha temporária
+    Ok(HttpResponse::Created().json(ApiResponse::success_with_message(
+        temp_password_response,
+        "Senha temporária criada com sucesso! 🎉"
     )))
 }
 
