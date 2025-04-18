@@ -6,7 +6,8 @@ use crate::models::{
 };
 use crate::services::rbac_service::RbacService;
 use crate::middleware::permission::PermissionAuth;
-use serde::Serialize;
+// use serde::Serialize; // Removido
+// use validator::Validate; // Removido
 
 // --- Funções Handler para Permissões ---
 

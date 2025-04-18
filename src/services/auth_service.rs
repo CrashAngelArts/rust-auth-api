@@ -16,11 +16,10 @@ use tracing::{error, info, warn};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use sha2::{Digest, Sha256};
-use uuid::Uuid; // Importar Uuid
-use moka::future::Cache; // Importar Moka Cache
-use std::collections::HashMap; // Importar HashMap
-use rusqlite::OptionalExtension; // Mantido para outras queries
-use std::sync::Arc; // Mantido para as funções wrapper
+use uuid::Uuid;
+use moka::future::Cache;
+use std::collections::HashMap;
+// use rusqlite::OptionalExtension; // Removido - não usado aqui
 
 pub struct AuthService;
 
@@ -144,10 +143,10 @@ impl AuthService {
                 "UPDATE users SET failed_login_attempts = ?1, locked_until = ?2, unlock_token = ?3, unlock_token_expires_at = ?4, updated_at = ?5 WHERE id = ?6",
                 (
                     &user.failed_login_attempts,
-                    &user.locked_until,
+                    &user.locked_until.map(|dt| dt.timestamp()), // Passar Option<i64>
                     &user.unlock_token,
-                    &user.unlock_token_expires_at,
-                    &Utc::now(),
+                    &user.unlock_token_expires_at.map(|dt| dt.timestamp()), // Passar Option<i64>
+                    &Utc::now().timestamp(), // Passar i64
                     &user.id,
                 ),
             )?;

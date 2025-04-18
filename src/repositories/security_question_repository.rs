@@ -3,8 +3,7 @@ use crate::errors::ApiError;
 use crate::models::security_question::{SecurityQuestion, UserSecurityAnswer};
 use chrono::Utc;
 use rusqlite::{params, OptionalExtension};
-use tracing::{error, info};
-use uuid::Uuid;
+use tracing::{info};
 
 pub struct SqliteSecurityQuestionRepository;
 

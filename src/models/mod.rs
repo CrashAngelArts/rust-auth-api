@@ -13,5 +13,6 @@ pub mod permission;
 pub mod security_question;
 pub mod webhook;
 pub mod webauthn;
+pub mod temporary_password;
 
 

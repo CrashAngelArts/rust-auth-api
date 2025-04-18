@@ -8,7 +8,6 @@ use crate::models::security_question::{
 use crate::repositories::security_question_repository::SqliteSecurityQuestionRepository;
 use bcrypt::{hash, verify};
 use rusqlite::OptionalExtension;
-use tracing::info;
 
 pub struct SecurityQuestionService;
 

@@ -1,7 +1,7 @@
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use validator::{Validate, ValidationError, ValidationErrors};
+use validator::{Validate, ValidationError};
 
 // Custom validation function to ensure either token or recovery_code is present
 fn validate_reset_method(dto: &ResetPasswordDto) -> Result<(), ValidationError> {

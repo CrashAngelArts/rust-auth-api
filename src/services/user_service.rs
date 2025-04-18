@@ -1,16 +1,23 @@
 use crate::db::DbPool;
 use crate::errors::ApiError;
 use crate::models::user::{ChangePasswordDto, CreateUserDto, UpdateUserDto, User, UserResponse};
+use crate::models::temporary_password::{
+    CreateTemporaryPasswordDto, TemporaryPassword, TemporaryPasswordResponse,
+};
+use crate::repositories::temporary_password_repository;
+use crate::config::Config;
 use crate::utils::password::check_password_strength;
 use bcrypt::{hash, verify};
 use crate::utils::password_argon2;
 use chrono::{Utc, TimeZone, DateTime};
 use std::env;
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{error, info, instrument};
 use rusqlite::{params, OptionalExtension, Result as SqlResult, Row};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
+use validator::Validate;
+use std::collections::HashMap;
 
 pub struct UserService;
 
@@ -471,5 +478,54 @@ impl UserService {
 
         info!("🗑️ Código de recuperação limpo para o usuário {}", user_id);
         Ok(())
+    }
+
+    // ✨ Nova Função para definir senha temporária
+    #[instrument(skip(pool, dto, _config))]
+    pub async fn set_temporary_password(
+        pool: Arc<DbPool>,
+        user_id: &str,
+        dto: CreateTemporaryPasswordDto,
+        _config: &Config,
+    ) -> Result<TemporaryPasswordResponse, ApiError> {
+        // 1. Validar o DTO
+        dto.validate().map_err(|e| {
+            let mut errors = HashMap::new();
+            errors.insert("_error".to_string(), e.field_errors().values().flat_map(|v| v.iter().filter_map(|fe| fe.message.as_ref().map(|s| s.to_string()))).collect());
+            ApiError::ValidationError(errors)
+        })?;
+
+        let password = dto.password.ok_or_else(||
+            ApiError::BadRequestError("Senha temporária não fornecida".to_string()))?;
+
+        // 2. Verificar força da senha (opcional, mas recomendado)
+        if let Err(unmet) = check_password_strength(&password) {
+            let error_message = format!(
+                "Senha temporária fraca ❌: {}",
+                unmet.join(", ")
+            );
+            return Err(ApiError::BadRequestError(error_message));
+        }
+
+        // 3. Gerar hash da senha temporária
+        let password_hash = password_argon2::hash_password(&password).map_err(|e|
+            ApiError::InternalServerError(format!("Erro ao hashear senha temporária: {}", e)))?;
+
+        // 4. Deletar qualquer senha temporária ativa existente para este usuário
+        temporary_password_repository::delete_active_by_user_id(pool.clone(), user_id).await?;
+        info!("Senha(s) temporária(s) ativa(s) anterior(es) removida(s) para o usuário {}", user_id);
+
+        // 5. Criar nova instância e salvar no banco
+        let temp_password = TemporaryPassword::new(
+            user_id.to_string(),
+            password_hash,
+            dto.usage_limit,
+        );
+        temporary_password_repository::create(pool.clone(), &temp_password).await?;
+
+        info!("✅ Senha temporária criada para o usuário {}", user_id);
+
+        // 6. Retornar a resposta
+        Ok((&temp_password).into())
     }
 }
