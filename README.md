@@ -26,6 +26,7 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação,
 - RBAC (Role-Based Access Control) com gerenciamento fino de permissões 🎭
 - Autorização granular baseada em permissões via middleware 🔐
 - Senhas temporárias com limite de uso configurável 🔑
+- Rastreamento e análise de localização de login 🌎
 
 ### Funcionalidades 🛠️
 - Sistema completo de autenticação
@@ -48,6 +49,7 @@ API REST em Rust com autenticação avançada, análise de ritmo de digitação,
 - Associação entre Papéis/Permissões e Usuários/Papéis via serviço RBAC 🔗
 - Verificação de permissões de usuário via serviço RBAC ✅
 - Criação de senhas temporárias com limite de uso para acesso controlado 🔑
+- Detecção de logins suspeitos baseada em localização geográfica 🗺️
 
 ## Requisitos
 
@@ -295,9 +297,29 @@ Para reportar bugs ou solicitar novas funcionalidades, abra uma issue no reposit
 - [x] Implementar autenticação via OAuth
 - [x] Implementar cache de validação de token (Moka)
 - [x] Implementar senhas temporárias com limite de uso
+- [x] Implementar rastreamento e análise de localização de login
 - [ ] Adicionar suporte a múltiplos tenants
 - [ ] Implementar sistema de permissões granular
 - [ ] Adicionar suporte a múltiplos idiomas
 - [ ] Implementar cache de sessões
 - [ ] Adicionar suporte a webhooks
 - [ ] Adicionar autenticação com WebAuthn/FIDO2
+
+### Localizações de Login (`/api/locations`) 🌎
+
+- `GET /` - Listar minhas localizações de login
+- `GET /users/{user_id}` - Listar localizações de login de um usuário (admin)
+- `DELETE /clean` - Remover localizações de login antigas (admin)
+
+## Sistema de Rastreamento de Localização 🗺️
+
+O sistema agora inclui rastreamento e análise de localização de login:
+
+- Detecção de logins suspeitos baseada em análise geográfica 🌍
+- Cálculo de velocidade implícita entre logins consecutivos ⚡
+- Identificação de mudanças improváveis de localização 🔍
+- Pontuação de risco baseada em múltiplos fatores 📊
+- Interface para visualização de histórico de localizações 📱
+- Proteção contra tentativas de acesso de localizações suspeitas 🛡️
+
+Para mais detalhes, consulte a [documentação de rastreamento de localização](docs/location_tracking.md).
