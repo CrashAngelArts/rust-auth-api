@@ -27,6 +27,9 @@ pub enum ApiError {
     #[error("Erro de email: {0}")]
     EmailError(String),
 
+    #[error("Erro de serialização: {0}")]
+    SerializationError(String),
+
     #[error("Erro interno do servidor: {0}")]
     InternalServerError(String),
 
@@ -141,6 +144,7 @@ impl ResponseError for ApiError {
             ApiError::NotFoundError(_) => StatusCode::NOT_FOUND,         // 404
             ApiError::DatabaseError(_) => StatusCode::INTERNAL_SERVER_ERROR, // 500
             ApiError::EmailError(_) => StatusCode::INTERNAL_SERVER_ERROR,    // 500
+            ApiError::SerializationError(_) => StatusCode::INTERNAL_SERVER_ERROR, // 500
             ApiError::InternalServerError(_) => StatusCode::INTERNAL_SERVER_ERROR, // 500
             ApiError::ConflictError(_) => StatusCode::CONFLICT,           // 409
             ApiError::BadRequestError(_) => StatusCode::BAD_REQUEST,      // 400
@@ -223,6 +227,13 @@ impl From<ValidationErrors> for ApiError {
             details.insert(field.to_string(), messages);
         }
         ApiError::ValidationError(details)
+    }
+}
+
+// Adicionar conversão de erro do serde_json para ApiError
+impl From<serde_json::Error> for ApiError {
+    fn from(error: serde_json::Error) -> ApiError {
+        ApiError::SerializationError(error.to_string())
     }
 }
 
